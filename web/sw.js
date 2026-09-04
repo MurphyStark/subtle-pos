@@ -11,6 +11,7 @@ const APP_SHELL = [
   './css/style.css',
   './js/config.js',
   './js/supabaseClient.js',
+  './js/mockClient.js',
   './js/auth.js',
   './js/money.js',
   './js/db.js',

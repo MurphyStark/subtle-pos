@@ -14,9 +14,23 @@ python3 -m http.server 8080
 # or: npx serve .
 ```
 
-Then open `http://localhost:8080`. Before anything will actually work, fill in
-`js/config.js` with a real Supabase project URL + anon key (see `../README.md`), apply the
-migrations, and create at least one `auth.users` + matching `user_profiles` row to sign in
+Then open `http://localhost:8080`.
+
+## Demo mode
+
+`js/config.js` currently still has its placeholder Supabase URL. Rather than that meaning
+nothing works, `js/supabaseClient.js` detects the placeholder and automatically swaps in
+`js/mockClient.js` — a stand-in that implements exactly the subset of the Supabase API this
+app calls, backed by realistic sample data (10 products, both locations, four demo
+accounts — one per role) persisted to `localStorage`. The login page shows one-click
+sign-in buttons for each role plus a "Reset demo data" button. Selling something in
+checkout visibly decrements stock on the Inventory page, same as the real thing would.
+
+**This is a real dependency, not a toy — it's what makes the deployed site demoable before
+a Supabase project exists.** Swap-out is automatic: once `js/config.js` has a real project
+URL + anon key (see `../README.md`), demo mode turns itself off and every page talks to the
+real Supabase project instead. No other file needs to change. At that point you'll also
+need to create at least one real `auth.users` + matching `user_profiles` row to sign in
 with (Supabase Studio's Authentication tab, or `supabase auth` CLI, then insert the
 `user_profiles` row by hand for now — there's no admin UI for that yet, see below).
 

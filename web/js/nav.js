@@ -1,3 +1,5 @@
+import { isDemoMode } from './supabaseClient.js';
+
 // Shared header, rendered into <nav id="app-nav"> on every authenticated page. Role-based
 // link visibility here is a UX convenience only -- RLS is what actually enforces access if
 // someone navigates to a restricted page or hits the API directly.
@@ -8,7 +10,7 @@ export function renderNav(profile) {
   const isManager = profile.role !== 'cashier';
 
   nav.innerHTML = `
-    <div class="nav-brand">Subtle POS</div>
+    <div class="nav-brand">Subtle POS ${isDemoMode() ? '<span class="demo-badge">DEMO DATA</span>' : ''}</div>
     <div class="nav-links">
       <a href="pos.html">Checkout</a>
       ${isManager ? '<a href="inventory.html">Inventory</a>' : ''}

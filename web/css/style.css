@@ -30,7 +30,16 @@ nav#app-nav {
   color: white;
   flex-wrap: wrap;
 }
-nav#app-nav .nav-brand { font-weight: 700; font-size: 1.1rem; }
+nav#app-nav .nav-brand { font-weight: 700; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; }
+.demo-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: var(--warning);
+  color: white;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+}
 nav#app-nav .nav-links a {
   color: white;
   text-decoration: none;
