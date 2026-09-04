@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Subtle POS — Sign in</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <main class="login-shell">
+    <div class="card login-card">
+      <h1>Subtle POS</h1>
+      <p style="color: var(--text-muted); margin: 0;">Sign in with the account your manager set up for you.</p>
+      <form id="login-form">
+        <input type="email" name="email" placeholder="Email" autocomplete="username" required />
+        <input type="password" name="password" placeholder="Password" autocomplete="current-password" required />
+        <button type="submit" class="primary">Sign in</button>
+        <p class="error" id="login-error"></p>
+      </form>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="js/login.js"></script>
+</body>
+</html>

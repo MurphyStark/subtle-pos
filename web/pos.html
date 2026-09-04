@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Subtle POS — Checkout</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <nav id="app-nav"></nav>
+
+  <main>
+    <div id="status-banner"></div>
+
+    <div class="pos-layout">
+      <section class="card">
+        <div class="sale-type-toggle">
+          <button type="button" id="type-retail" class="active">Retail</button>
+          <button type="button" id="type-wholesale">Wholesale</button>
+        </div>
+        <input type="search" id="product-search" class="product-search" placeholder="Search by name, SKU, or barcode…" />
+        <div id="product-grid" class="product-grid"></div>
+      </section>
+
+      <section class="card">
+        <h2>Cart</h2>
+        <div id="cart-lines"></div>
+        <div class="cart-totals">
+          <div class="line"><span>Subtotal</span><span id="cart-subtotal">$0.00</span></div>
+          <div class="line">
+            <span>Discount</span>
+            <input type="number" id="cart-discount" min="0" step="0.01" value="0" style="width: 90px; text-align: right;" />
+          </div>
+          <div class="line">
+            <span>Tax (VAT)</span>
+            <input type="number" id="cart-tax" min="0" step="0.01" value="0" style="width: 90px; text-align: right;" />
+          </div>
+          <div class="line grand"><span>Total</span><span id="cart-total">$0.00</span></div>
+        </div>
+        <div style="margin-top: 0.75rem;">
+          <label for="payment-method" style="font-size: 0.85rem; color: var(--text-muted);">Payment method</label>
+          <select id="payment-method" style="width: 100%;">
+            <option value="cash">Cash</option>
+            <option value="card">Card</option>
+            <option value="ecocash">EcoCash</option>
+            <option value="bank_transfer">Bank transfer</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <button type="button" id="checkout-btn" class="primary" style="width: 100%; margin-top: 0.9rem;" disabled>
+          Complete sale
+        </button>
+        <p class="error" id="checkout-error"></p>
+      </section>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="js/pos.js"></script>
+</body>
+</html>
