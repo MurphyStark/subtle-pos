@@ -180,6 +180,20 @@ button.ghost {
 .price-edit-row { display: flex; gap: 0.4rem; align-items: center; margin-top: 0.3rem; }
 .price-edit-row input { width: 80px; }
 
+.product-card { margin-bottom: 0.75rem; }
+.product-card-header {
+  display: flex; align-items: center; gap: 0.75rem; cursor: pointer;
+}
+.product-card-header .name { font-weight: 600; flex: 1; }
+.product-card-header .meta { color: var(--text-muted); font-size: 0.85rem; }
+.product-card-body { margin-top: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.75rem; }
+.product-card-body[hidden] { display: none; }
+.variant-table { width: 100%; margin-bottom: 0.75rem; }
+.variant-table th, .variant-table td { font-size: 0.85rem; padding: 0.35rem 0.5rem; }
+.add-variant-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0.5rem; align-items: end; }
+.add-variant-form label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.78rem; color: var(--text-muted); }
+.add-variant-form input, .add-variant-form select { width: 100%; }
+
 /* --- stock take --- */
 .stock-take-row { display: grid; grid-template-columns: 1fr 90px 110px; gap: 0.6rem; align-items: center; padding: 0.35rem 0; border-bottom: 1px solid var(--border); }
 .stock-take-row input { width: 100%; }

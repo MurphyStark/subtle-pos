@@ -9,6 +9,13 @@ import { showReceipt } from './receipt.js';
 
 // MVP simplification, flagged in the README: one currency and one payment method per sale.
 // Split/multi-currency tender (sale_payments supports it) is a stretch goal, not built yet.
+//
+// KNOWN BROKEN as of the product_variants migration (step 1 of the fashion-retail plan):
+// this file still queries products.sku/product_prices/sale_items by product_id, all of
+// which now live one level down on product_variants (see that migration's header comment
+// and web/README.md). Reworking checkout for a size/color picker is its own deliberately
+// separate step (step 4) so it can be reviewed on its own -- until then this page will not
+// load products correctly against either the real schema or the updated mockClient.js.
 
 let profile = null;
 let products = [];

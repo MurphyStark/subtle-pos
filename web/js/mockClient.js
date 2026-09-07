@@ -1,14 +1,22 @@
 // Demo-mode stand-in for the Supabase client, used automatically (see supabaseClient.js)
 // whenever js/config.js still has its placeholder project URL -- i.e. before a real
 // Supabase project exists. Implements exactly the subset of the Supabase JS API this app
-// actually calls (verified against every `.from(...)` / `.auth.*` / `.storage.*` call site
-// in web/js/), backed by realistic seed data persisted to localStorage so a demo's actions
-// -- a completed sale, a stock take, a new product -- survive a page reload.
+// actually calls (including `.storage.*`), backed by realistic seed data persisted to
+// localStorage so a demo's actions -- a completed sale, a stock take, a new product --
+// survive a page reload.
 //
 // This is a real dependency, not a footnote: swap-out is automatic. Fill in real values in
 // config.js and this file stops being used entirely -- nothing else in web/ changes.
+//
+// SHAPE NOTE: this mirrors the real schema's product_variants model (see the
+// product_variants migration) -- products carry name/description/currency/pricing/cost
+// only; sku/barcode/physical stock live on product_variants. Every product has at least
+// one variant, same as the real migration's zero-data-loss backfill guarantees. pos.js
+// (checkout) has not been reworked for this shape yet (that's a later step), so it will
+// not function correctly against this file until it is -- admin.html, inventory.html, and
+// stock-take.html are what this pass keeps working.
 
-const STATE_KEY = 'subtle-pos-demo-state-v1';
+const STATE_KEY = 'subtle-pos-demo-state-v2';
 const SESSION_KEY = 'subtle-pos-demo-session-v1';
 
 export const DEMO_LOCATIONS = [
@@ -27,65 +35,119 @@ export const DEMO_ACCOUNTS = [
   { id: 'user-cashier', email: 'cashier@subtlepos.demo', full_name: 'Tapiwa Dube', role: 'cashier', primary_location_id: 'loc-shop' },
 ];
 
+// Each product optionally lists variants (size/color/sku suffix/qty per location). A
+// product with no `variants` array gets exactly one default variant (size/color null),
+// same as the real migration's backfill of pre-existing flat-SKU products.
 const PRODUCT_SEED = [
-  { sku: 'SA-001', name: 'Leather Wallet', retail: 1800, wholesale: 1200, cost: 900, qty: { 'loc-shop': 42, 'loc-wholesale': 120 } },
-  { sku: 'SA-002', name: 'Aviator Sunglasses', retail: 2200, wholesale: 1500, cost: 1100, qty: { 'loc-shop': 28, 'loc-wholesale': 90 } },
-  { sku: 'SA-003', name: 'Beaded Bracelet', retail: 800, wholesale: 500, cost: 350, qty: { 'loc-shop': 65, 'loc-wholesale': 200 } },
-  { sku: 'SA-004', name: 'Phone Case — iPhone 14', retail: 1500, wholesale: 950, cost: 700, qty: { 'loc-shop': 37, 'loc-wholesale': 110 } },
-  { sku: 'SA-005', name: 'Canvas Tote Bag', retail: 2500, wholesale: 1700, cost: 1250, qty: { 'loc-shop': 20, 'loc-wholesale': 65 } },
-  { sku: 'SA-006', name: 'Stainless Steel Watch', retail: 4500, wholesale: 3200, cost: 2400, qty: { 'loc-shop': 15, 'loc-wholesale': 40 } },
-  { sku: 'SA-007', name: 'Hoop Earrings', retail: 1000, wholesale: 650, cost: 450, qty: { 'loc-shop': 50, 'loc-wholesale': 150 } },
-  { sku: 'SA-008', name: 'Leather Belt', retail: 1600, wholesale: 1050, cost: 800, qty: { 'loc-shop': 33, 'loc-wholesale': 95 } },
-  { sku: 'SA-009', name: 'Baseball Cap', retail: 1200, wholesale: 800, cost: 550, qty: { 'loc-shop': 44, 'loc-wholesale': 130 } },
-  { sku: 'SA-010', name: 'Silk Scarf', retail: 1900, wholesale: 1300, cost: 950, qty: { 'loc-shop': 18, 'loc-wholesale': 55 } },
+  {
+    sku: 'SA-001',
+    name: 'Leather Wallet',
+    description: 'Full-grain leather bifold wallet.',
+    retail: 1800,
+    wholesale: 1200,
+    cost: 900,
+    variants: [
+      { size: null, color: 'Brown', skuSuffix: 'BRN', qty: { 'loc-shop': 22, 'loc-wholesale': 60 } },
+      { size: null, color: 'Black', skuSuffix: 'BLK', qty: { 'loc-shop': 20, 'loc-wholesale': 60 } },
+    ],
+  },
+  { sku: 'SA-002', name: 'Aviator Sunglasses', description: 'UV400 mirrored lenses.', retail: 2200, wholesale: 1500, cost: 1100, qty: { 'loc-shop': 28, 'loc-wholesale': 90 } },
+  { sku: 'SA-003', name: 'Beaded Bracelet', description: 'Handmade glass-bead bracelet.', retail: 800, wholesale: 500, cost: 350, qty: { 'loc-shop': 65, 'loc-wholesale': 200 } },
+  { sku: 'SA-004', name: 'Phone Case — iPhone 14', description: 'Shock-absorbing silicone case.', retail: 1500, wholesale: 950, cost: 700, qty: { 'loc-shop': 37, 'loc-wholesale': 110 } },
+  { sku: 'SA-005', name: 'Canvas Tote Bag', description: 'Heavyweight cotton canvas tote.', retail: 2500, wholesale: 1700, cost: 1250, qty: { 'loc-shop': 20, 'loc-wholesale': 65 } },
+  { sku: 'SA-006', name: 'Stainless Steel Watch', description: 'Quartz movement, sapphire coating.', retail: 4500, wholesale: 3200, cost: 2400, qty: { 'loc-shop': 15, 'loc-wholesale': 40 } },
+  { sku: 'SA-007', name: 'Hoop Earrings', description: 'Gold-plated stainless steel hoops.', retail: 1000, wholesale: 650, cost: 450, qty: { 'loc-shop': 50, 'loc-wholesale': 150 } },
+  {
+    sku: 'SA-008',
+    name: 'Leather Belt',
+    description: 'Full-grain leather belt, brass buckle.',
+    retail: 1600,
+    wholesale: 1050,
+    cost: 800,
+    variants: [
+      { size: 'S', color: null, skuSuffix: 'S', qty: { 'loc-shop': 12, 'loc-wholesale': 30 } },
+      { size: 'M', color: null, skuSuffix: 'M', qty: { 'loc-shop': 14, 'loc-wholesale': 35 } },
+      { size: 'L', color: null, skuSuffix: 'L', qty: { 'loc-shop': 10, 'loc-wholesale': 30 } },
+    ],
+  },
+  { sku: 'SA-009', name: 'Baseball Cap', description: 'Adjustable cotton twill cap.', retail: 1200, wholesale: 800, cost: 550, qty: { 'loc-shop': 44, 'loc-wholesale': 130 } },
+  {
+    sku: 'SA-010',
+    name: 'Silk Scarf',
+    description: '100% silk, hand-rolled edges.',
+    retail: 1900,
+    wholesale: 1300,
+    cost: 950,
+    variants: [
+      { size: null, color: 'Red', skuSuffix: 'RED', qty: { 'loc-shop': 9, 'loc-wholesale': 28 } },
+      { size: null, color: 'Blue', skuSuffix: 'BLU', qty: { 'loc-shop': 9, 'loc-wholesale': 27 } },
+    ],
+  },
 ];
 
 function buildSeed() {
   const products = [];
+  const variants = [];
   const prices = [];
   const balances = [];
   const cost_history = [];
 
   PRODUCT_SEED.forEach((p, i) => {
-    const id = `prod-${i + 1}`;
+    const productId = `prod-${i + 1}`;
     products.push({
-      id,
-      sku: p.sku,
-      barcode: null,
+      id: productId,
       name: p.name,
+      description: p.description ?? null,
+      category_id: null,
       base_currency: 'USD',
       min_wholesale_qty: 6,
       is_active: true,
       image_url: null,
     });
-    prices.push({ product_id: id, price_type: 'retail', unit_price_cents: p.retail, currency: 'USD', effective_date: '2026-01-01' });
-    prices.push({ product_id: id, price_type: 'wholesale', unit_price_cents: p.wholesale, currency: 'USD', effective_date: '2026-01-01' });
+    prices.push({ product_id: productId, price_type: 'retail', unit_price_cents: p.retail, currency: 'USD', effective_date: '2026-01-01' });
+    prices.push({ product_id: productId, price_type: 'wholesale', unit_price_cents: p.wholesale, currency: 'USD', effective_date: '2026-01-01' });
     cost_history.push({
-      id: `cost-seed-${id}`,
-      product_id: id,
+      id: `cost-seed-${productId}`,
+      product_id: productId,
       supplier_id: MANUAL_SUPPLIER_ID,
       unit_cost_cents: p.cost,
       currency: 'USD',
       effective_date: '2026-01-01',
       stock_receipt_id: null,
     });
-    for (const locId of Object.keys(p.qty)) {
-      balances.push({
-        id: `bal-${id}-${locId}`,
-        product_id: id,
-        location_id: locId,
-        quantity_available: p.qty[locId],
-        average_unit_cost_cents: p.cost,
-        currency: 'USD',
-        needs_review: false,
-        needs_review_reason: null,
-        updated_at: new Date().toISOString(),
+
+    const variantDefs = p.variants ?? [{ size: null, color: null, skuSuffix: null, qty: p.qty }];
+    variantDefs.forEach((v, vi) => {
+      const variantId = `var-${productId}-${vi + 1}`;
+      const sku = v.skuSuffix ? `${p.sku}-${v.skuSuffix}` : p.sku;
+      variants.push({
+        id: variantId,
+        product_id: productId,
+        size: v.size ?? null,
+        color: v.color ?? null,
+        sku,
+        barcode: null,
+        is_active: true,
       });
-    }
+      for (const locId of Object.keys(v.qty ?? {})) {
+        balances.push({
+          id: `bal-${variantId}-${locId}`,
+          variant_id: variantId,
+          location_id: locId,
+          quantity_available: v.qty[locId],
+          average_unit_cost_cents: p.cost,
+          currency: 'USD',
+          needs_review: false,
+          needs_review_reason: null,
+          updated_at: new Date().toISOString(),
+        });
+      }
+    });
   });
 
   return {
     products,
+    variants,
     prices,
     balances,
     cost_history,
@@ -154,6 +216,8 @@ function tableRows(table) {
   switch (table) {
     case 'products':
       return state.products;
+    case 'product_variants':
+      return state.variants;
     case 'product_prices':
       return state.prices;
     case 'product_cost_history':
@@ -185,12 +249,12 @@ function tableRows(table) {
   }
 }
 
-function findOrCreateBalance(productId, locationId, currency) {
-  let balance = state.balances.find((b) => b.product_id === productId && b.location_id === locationId);
+function findOrCreateBalance(variantId, locationId, currency) {
+  let balance = state.balances.find((b) => b.variant_id === variantId && b.location_id === locationId);
   if (!balance) {
     balance = {
-      id: `bal-${productId}-${locationId}`,
-      product_id: productId,
+      id: `bal-${variantId}-${locationId}`,
+      variant_id: variantId,
       location_id: locationId,
       quantity_available: 0,
       average_unit_cost_cents: 0,
@@ -206,21 +270,26 @@ function findOrCreateBalance(productId, locationId, currency) {
 
 // Mirrors fn_apply_sale_item_inventory_impact: decrement the selling location's stock the
 // moment a sale_items row is written, so Inventory reflects a demo sale immediately.
+// NOTE: sale_items now key on variant_id -- pos.js has not been reworked to send that yet
+// (that's a later step), so this path is currently unreachable from the UI until it is.
 function applySaleItemStockImpact(row) {
   const sale = state.sales.find((s) => s.id === row.sale_id);
   if (!sale) return;
-  const balance = findOrCreateBalance(row.product_id, sale.location_id, row.currency);
+  const balance = findOrCreateBalance(row.variant_id, sale.location_id, row.currency);
   balance.quantity_available -= row.quantity;
   balance.updated_at = new Date().toISOString();
 }
 
 // Mirrors fn_apply_stock_receipt_item: recompute the location's weighted-average cost and
-// drop a product_cost_history row, so admin-entered initial stock behaves exactly like a
-// real stock receipt would against the live schema.
+// drop a product_cost_history row (still product_id-keyed -- cost is shared across a
+// product's variants by design, see the product_variants migration), so admin-entered
+// stock behaves exactly like a real stock receipt would against the live schema.
 function applyStockReceiptItem(row) {
   const receipt = state.stock_receipts.find((r) => r.id === row.stock_receipt_id);
   if (!receipt) return;
-  const balance = findOrCreateBalance(row.product_id, receipt.location_id, receipt.currency);
+  const variant = state.variants.find((v) => v.id === row.variant_id);
+  if (!variant) return;
+  const balance = findOrCreateBalance(row.variant_id, receipt.location_id, receipt.currency);
 
   const existingQty = balance.quantity_available;
   const existingAvg = balance.average_unit_cost_cents;
@@ -236,7 +305,7 @@ function applyStockReceiptItem(row) {
 
   state.cost_history.push({
     id: `cost-${crypto.randomUUID()}`,
-    product_id: row.product_id,
+    product_id: variant.product_id,
     supplier_id: receipt.supplier_id,
     unit_cost_cents: row.unit_landed_cost_cents,
     currency: receipt.currency,
@@ -250,7 +319,7 @@ function applyStockReceiptItem(row) {
 function applyStockCountCompletion(stockCountRow) {
   const items = state.stock_count_items.filter((i) => i.stock_count_id === stockCountRow.id);
   for (const item of items) {
-    const balance = findOrCreateBalance(item.product_id, stockCountRow.location_id);
+    const balance = findOrCreateBalance(item.variant_id, stockCountRow.location_id);
     balance.quantity_available = item.counted_quantity;
     balance.needs_review = false;
     balance.needs_review_reason = null;
@@ -300,6 +369,11 @@ class MockQuery {
   }
   eq(col, val) {
     this._filters.push((r) => r[col] === val);
+    return this;
+  }
+  in(col, vals) {
+    const set = new Set(vals);
+    this._filters.push((r) => set.has(r[col]));
     return this;
   }
   order(col, opts = {}) {

@@ -7,10 +7,13 @@ import { registerServiceWorker } from './pwa.js';
 // cashier insert at their primary_location_id); only managers/owner can pick a different
 // location. That's enforced both here (so the UI matches what will actually be allowed)
 // and by RLS itself if someone bypasses the UI.
+//
+// Stock is tracked per VARIANT (size/color/SKU), not per product -- see the
+// product_variants migration -- so a stock take counts variants, not products.
 let profile = null;
 let locations = [];
 let currentLocationId = null;
-let rows = []; // [{ product, systemQty }]
+let rows = []; // [{ variant, productName, systemQty }]
 
 async function init() {
   registerServiceWorker();
@@ -42,15 +45,22 @@ async function init() {
 
 async function loadCounts() {
   const client = getClient();
-  const [{ data: products }, { data: balances }] = await Promise.all([
-    client.from('products').select('id, sku, name').eq('is_active', true),
-    client.from('v_inventory_balances').select('product_id, location_id, quantity_available').eq('location_id', currentLocationId),
+  const [{ data: variants }, { data: products }, { data: balances }] = await Promise.all([
+    client.from('product_variants').select('id, product_id, size, color, sku').eq('is_active', true),
+    client.from('products').select('id, name'),
+    client.from('v_inventory_balances').select('variant_id, location_id, quantity_available').eq('location_id', currentLocationId),
   ]);
 
-  const qtyByProduct = Object.fromEntries((balances ?? []).map((b) => [b.product_id, b.quantity_available]));
-  rows = (products ?? [])
-    .map((p) => ({ product: p, systemQty: qtyByProduct[p.id] ?? 0 }))
-    .sort((a, b) => a.product.name.localeCompare(b.product.name));
+  const productById = Object.fromEntries((products ?? []).map((p) => [p.id, p]));
+  const qtyByVariant = Object.fromEntries((balances ?? []).map((b) => [b.variant_id, b.quantity_available]));
+
+  rows = (variants ?? [])
+    .map((v) => ({
+      variant: v,
+      productName: productById[v.product_id]?.name ?? 'Unknown product',
+      systemQty: qtyByVariant[v.id] ?? 0,
+    }))
+    .sort((a, b) => a.productName.localeCompare(b.productName) || (a.variant.sku ?? '').localeCompare(b.variant.sku ?? ''));
 
   renderRows();
 }
@@ -59,28 +69,29 @@ function renderRows() {
   const container = document.getElementById('stock-take-body');
   const header = `
     <div class="stock-take-row" style="font-weight: 600; font-size: 0.85rem; color: var(--text-muted);">
-      <div>Product</div><div>System qty</div><div>Counted qty</div>
+      <div>Product / variant</div><div>System qty</div><div>Counted qty</div>
     </div>`;
 
   container.innerHTML =
     header +
     rows
-      .map(
-        (r) => `
-      <div class="stock-take-row" data-id="${r.product.id}">
-        <div>${r.product.name} <span style="color: var(--text-muted); font-size: 0.8rem;">(${r.product.sku})</span></div>
+      .map((r) => {
+        const variantLabel = [r.variant.size, r.variant.color].filter(Boolean).join(' / ');
+        return `
+      <div class="stock-take-row" data-id="${r.variant.id}">
+        <div>${r.productName}${variantLabel ? ` — ${variantLabel}` : ''} <span style="color: var(--text-muted); font-size: 0.8rem;">(${r.variant.sku})</span></div>
         <div>${r.systemQty}</div>
         <div>
           <input type="number" min="0" step="1" class="counted-input" value="${r.systemQty}" />
           <span class="variance-flag"></span>
         </div>
-      </div>`
-      )
+      </div>`;
+      })
       .join('');
 
   container.querySelectorAll('.stock-take-row[data-id]').forEach((rowEl) => {
     const id = rowEl.dataset.id;
-    const row = rows.find((r) => r.product.id === id);
+    const row = rows.find((r) => r.variant.id === id);
     const input = rowEl.querySelector('.counted-input');
     const flag = rowEl.querySelector('.variance-flag');
     const updateFlag = () => {
@@ -117,11 +128,11 @@ async function completeStockTake() {
 
     const container = document.getElementById('stock-take-body');
     const items = rows.map((r) => {
-      const input = container.querySelector(`.stock-take-row[data-id="${r.product.id}"] .counted-input`);
+      const input = container.querySelector(`.stock-take-row[data-id="${r.variant.id}"] .counted-input`);
       return {
         id: crypto.randomUUID(),
         stock_count_id: countId,
-        product_id: r.product.id,
+        variant_id: r.variant.id,
         counted_quantity: Number(input.value || 0),
         system_quantity_at_count: r.systemQty,
       };
@@ -134,7 +145,7 @@ async function completeStockTake() {
     await client.from('stock_counts').update({ status: 'completed', completed_at: nowIso }).eq('id', countId);
 
     const changed = items.filter((i) => i.counted_quantity !== i.system_quantity_at_count).length;
-    banner.innerHTML = `<div class="status-banner ok">Stock take completed — ${changed} product${changed === 1 ? '' : 's'} adjusted.</div>`;
+    banner.innerHTML = `<div class="status-banner ok">Stock take completed — ${changed} variant${changed === 1 ? '' : 's'} adjusted.</div>`;
 
     await loadCounts();
   } catch (err) {

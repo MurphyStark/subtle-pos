@@ -63,6 +63,9 @@ table/field-name parity. Places most likely to drift from the source document:
 - **Stock take reconciliation sets quantity to exactly what was counted**, not an adjustment
   layered on top (`fn_apply_stock_count_completion`) — a physical count is treated as ground
   truth. It also clears `needs_review`, since a fresh count supersedes whatever raised it.
+- **`product_variants` (size/color/SKU/barcode/stock) keeps price and cost at the product
+  level**, shared across all of a product's variants — only identity and physical stock
+  move down to the variant. See `20260901091000_product_variants.sql`'s header comment.
 
 ## Layout
 
@@ -87,11 +90,11 @@ No Supabase project exists yet for Subtle POS. To stand this up:
    invariant holds.
 5. Fill in `web/js/config.js` with the project's URL and anon key.
 
-## What's next (build order steps 2–10)
+## What's next
 
-Product creation with photos (`web/admin.html`), the offline queue + sync replay client, and
-stock takes (`web/stock-take.html`) are now built — see `web/README.md` for exactly what
-each does and doesn't cover. Still ahead: editing existing products, a real "receive more
-stock" flow, supplier management, transfers UI, returns UI, expenses, the profitability
-dashboard, and camera-based barcode scanning (a plug-in USB/Bluetooth scanner already works
-today, since those just type into whatever's focused).
+The project is now also mid-way through an 11-step fashion-retail evolution (size/color
+variants, purchase orders, returns, promotions, reporting, low-stock alerts) reviewed one
+step at a time — see `web/README.md`'s "Fashion-retail evolution" section for exact status.
+Steps 1 (data model) and 2 (admin: product + variant creation) are done; **checkout
+(`web/pos.html`) is currently broken** as a deliberate consequence — reworking it for a
+size/color picker is step 4, scoped separately so it can be reviewed on its own.
