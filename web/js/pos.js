@@ -5,6 +5,7 @@ import { cacheProducts, getCachedProducts, queueOutbox, countPendingOutbox } fro
 import { initSyncListeners, replayOutbox } from './sync.js';
 import { renderNav } from './nav.js';
 import { registerServiceWorker } from './pwa.js';
+import { showReceipt } from './receipt.js';
 
 // MVP simplification, flagged in the README: one currency and one payment method per sale.
 // Split/multi-currency tender (sale_payments supports it) is a stretch goal, not built yet.
@@ -13,6 +14,7 @@ let profile = null;
 let products = [];
 let cart = []; // [{ product, quantity }]
 let saleType = 'retail';
+let locationName = '';
 
 async function init() {
   registerServiceWorker();
@@ -23,6 +25,7 @@ async function init() {
   renderNav(profile);
 
   await loadProducts();
+  await loadLocationName();
   renderProductGrid();
   wireControls();
 
@@ -67,6 +70,16 @@ async function loadProducts() {
     }
   }
   products = await getCachedProducts();
+}
+
+async function loadLocationName() {
+  try {
+    const client = getClient();
+    const { data } = await client.from('locations').select('id, name').eq('id', profile.primary_location_id).single();
+    locationName = data?.name ?? '';
+  } catch {
+    locationName = '';
+  }
 }
 
 function currentPriceCents(product) {
@@ -289,12 +302,20 @@ async function completeSale() {
     });
   }
 
+  const receiptLines = cart.map((line) => ({
+    name: line.product.name,
+    quantity: line.quantity,
+    unitPriceCents: currentPriceCents(line.product),
+  }));
+
   cart = [];
   document.getElementById('cart-discount').value = 0;
   document.getElementById('cart-tax').value = 0;
   renderCart();
   await refreshStatusBanner();
   replayOutbox(refreshStatusBanner);
+
+  showReceipt({ sale, lines: receiptLines, locationName, cashierName: profile.full_name });
 }
 
 async function refreshStatusBanner() {

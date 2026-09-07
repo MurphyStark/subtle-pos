@@ -1,12 +1,14 @@
 // App-shell cache only: same-origin HTML/CSS/JS so the site loads offline. Supabase API
 // calls and the CDN script are deliberately left alone (`return` below) -- offline handling
 // for those is the IndexedDB outbox in js/db.js + js/sync.js, not a cached HTTP response.
-const CACHE_NAME = 'subtle-pos-shell-v1';
+const CACHE_NAME = 'subtle-pos-shell-v2';
 const APP_SHELL = [
   './',
   './index.html',
   './pos.html',
   './inventory.html',
+  './admin.html',
+  './stock-take.html',
   './manifest.webmanifest',
   './css/style.css',
   './js/config.js',
@@ -18,9 +20,13 @@ const APP_SHELL = [
   './js/sync.js',
   './js/nav.js',
   './js/pwa.js',
+  './js/image.js',
+  './js/receipt.js',
   './js/login.js',
   './js/pos.js',
   './js/inventory.js',
+  './js/admin.js',
+  './js/stock-take.js',
   './icons/icon.svg',
 ];
 

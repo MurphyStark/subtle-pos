@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Subtle POS — Stock Take</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/icon.svg" />
+  <meta name="theme-color" content="#17563b" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <nav id="app-nav"></nav>
+
+  <main>
+    <h1>Stock take</h1>
+    <p style="color: var(--text-muted); margin-top: -0.5rem;">
+      Count what's actually on the shelf. Whatever you enter here becomes the new system
+      quantity for that product at this location the moment you complete the count.
+    </p>
+
+    <div class="card" style="margin-bottom: 1rem;">
+      <label style="display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.85rem; color: var(--text-muted); max-width: 320px;">
+        Location
+        <select id="location-select"></select>
+      </label>
+    </div>
+
+    <div id="status-banner"></div>
+
+    <div class="card">
+      <div id="stock-take-body">Loading…</div>
+    </div>
+
+    <button type="button" id="complete-btn" class="primary" style="margin-top: 1rem;" disabled>
+      Complete stock take
+    </button>
+    <p class="error" id="stock-take-error"></p>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="js/stock-take.js"></script>
+</body>
+</html>

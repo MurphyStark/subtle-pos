@@ -13,7 +13,8 @@ export function renderNav(profile) {
     <div class="nav-brand">Subtle POS ${isDemoMode() ? '<span class="demo-badge">DEMO DATA</span>' : ''}</div>
     <div class="nav-links">
       <a href="pos.html">Checkout</a>
-      ${isManager ? '<a href="inventory.html">Inventory</a>' : ''}
+      <a href="stock-take.html">Stock Take</a>
+      ${isManager ? '<a href="inventory.html">Inventory</a><a href="admin.html">Admin</a>' : ''}
     </div>
     <div class="nav-user">
       <span>${profile.full_name} · ${profile.role.replace('_', ' ')}</span>

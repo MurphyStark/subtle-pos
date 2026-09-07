@@ -54,6 +54,15 @@ table/field-name parity. Places most likely to drift from the source document:
   `authenticated` on purpose — see the comment block at the top of
   `20260901090800_rls_policies.sql`).
 - Base currency assumed **USD** for `currency_rates.rate_to_base`. Revisit if that's wrong.
+- **Product photos go through Supabase Storage's `product-images` bucket** (public read,
+  manager/owner write — created directly in `20260901090900_admin_and_stock_take.sql` via
+  `storage.buckets`, no manual dashboard step needed), with `products.image_url` storing the
+  resulting public URL. Images are resized/compressed client-side to ~900px/JPEG before
+  upload (`web/js/image.js`) regardless of backend, since a raw phone photo is overkill for
+  a product thumbnail.
+- **Stock take reconciliation sets quantity to exactly what was counted**, not an adjustment
+  layered on top (`fn_apply_stock_count_completion`) — a physical count is treated as ground
+  truth. It also clears `needs_review`, since a fresh count supersedes whatever raised it.
 
 ## Layout
 
@@ -80,6 +89,9 @@ No Supabase project exists yet for Subtle POS. To stand this up:
 
 ## What's next (build order steps 2–10)
 
-Product/supplier/cost CRUD, the offline queue + sync replay client, transfers UI, returns
-flow, expenses, the profitability dashboard, and barcode/receipt printing are all still
-ahead — see the build prompt for the full sequence.
+Product creation with photos (`web/admin.html`), the offline queue + sync replay client, and
+stock takes (`web/stock-take.html`) are now built — see `web/README.md` for exactly what
+each does and doesn't cover. Still ahead: editing existing products, a real "receive more
+stock" flow, supplier management, transfers UI, returns UI, expenses, the profitability
+dashboard, and camera-based barcode scanning (a plug-in USB/Bluetooth scanner already works
+today, since those just type into whatever's focused).
