@@ -14,6 +14,7 @@ declare
   v_owner_id uuid := gen_random_uuid();
   v_location_id uuid;
   v_product_id uuid := gen_random_uuid();
+  v_variant_id uuid := gen_random_uuid();
   v_sale_id uuid := gen_random_uuid();
   v_sale_item_id uuid := gen_random_uuid();
   v_profit_before bigint;
@@ -34,20 +35,23 @@ begin
   insert into user_profiles (id, full_name, role, primary_location_id)
     values (v_owner_id, 'Test Owner', 'owner', v_location_id);
 
-  insert into products (id, sku, name) values (v_product_id, 'TEST-SKU-IMMUTABILITY', 'Test Product');
+  insert into products (id, name) values (v_product_id, 'Test Product');
+  insert into product_variants (id, product_id, sku) values (v_variant_id, v_product_id, 'TEST-SKU-IMMUTABILITY');
 
-  -- Cost basis must exist BEFORE the sale: fn_populate_sale_item_cost_snapshot looks up
-  -- product_cost_history as of the sale's created_at and populates unit_cost_at_sale_cents
-  -- itself -- the cashier's insert never supplies it (RLS makes cost unreadable to cashiers,
-  -- so it can't be client-supplied; see the sales_and_returns migration).
+  -- Cost basis must exist BEFORE the sale: fn_populate_sale_item_cost_snapshot resolves
+  -- variant_id -> product_id and looks up product_cost_history as of the sale's created_at,
+  -- populating unit_cost_at_sale_cents itself -- the cashier's insert never supplies it
+  -- (RLS makes cost unreadable to cashiers, so it can't be client-supplied; see the
+  -- sales_and_returns and product_variants migrations). Cost stays product-keyed even
+  -- though the sale line references the variant.
   insert into product_cost_history (product_id, unit_cost_cents, currency, effective_date)
     values (v_product_id, 600, 'USD', v_cost_before_sale);
 
   insert into sales (id, location_id, cashier_id, currency, subtotal_cents, total_cents, created_at)
     values (v_sale_id, v_location_id, v_owner_id, 'USD', 1000, 1000, v_sale_time);
 
-  insert into sale_items (id, sale_id, product_id, quantity, unit_selling_price_cents, currency)
-    values (v_sale_item_id, v_sale_id, v_product_id, 1, 1000, 'USD');
+  insert into sale_items (id, sale_id, variant_id, quantity, unit_selling_price_cents, currency)
+    values (v_sale_item_id, v_sale_id, v_variant_id, 1, 1000, 'USD');
 
   select gross_profit_cents into v_profit_before from sale_items where id = v_sale_item_id;
   assert v_profit_before = 400,
