@@ -120,8 +120,17 @@ button.ghost {
   align-items: center;
   justify-content: center;
 }
-.login-card { width: 100%; max-width: 360px; }
-.login-card form { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem; }
+.login-card { width: 100%; max-width: 360px; text-align: center; }
+.login-card form { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem; text-align: left; }
+.login-logo { width: 100%; max-width: 220px; display: block; margin: 0 auto; }
+.login-subtitle {
+  margin: 0 0 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
 
 /* --- POS / checkout --- */
 .pos-layout { display: grid; grid-template-columns: 1.4fr 1fr; gap: 1rem; align-items: start; }
@@ -212,6 +221,7 @@ button.ghost {
   max-height: 90vh; overflow-y: auto;
 }
 .receipt-paper h2 { text-align: center; margin: 0; letter-spacing: 0.05em; }
+.receipt-logo { display: block; width: 100%; max-width: 150px; margin: 0 auto; }
 .receipt-paper .tagline { text-align: center; font-size: 0.75rem; color: #555; margin: 0.15rem 0 0.75rem; }
 .receipt-paper hr { border: none; border-top: 1px dashed #999; margin: 0.6rem 0; }
 .receipt-line { display: flex; justify-content: space-between; font-size: 0.85rem; margin: 0.15rem 0; }

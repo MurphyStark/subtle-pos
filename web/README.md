@@ -143,11 +143,19 @@ with (Supabase Studio's Authentication tab, or `supabase auth` CLI, then insert 
   with a message rather than routing to an approval flow.
 - An admin flow for creating `user_profiles` rows (assigning roles to new staff accounts).
   Today that's a manual SQL insert after creating the `auth.users` account.
-- Real app icons — `icons/icon.svg` is a plain placeholder (a green square with "S"), and
-  `apple-touch-icon` points at that same SVG, which iOS Safari may not render as a home
-  screen icon (it has historically wanted PNG there) — it'll likely fall back to a page
-  screenshot on iOS specifically. Swap in real PNG icons (multiple sizes) when branded ones
-  exist.
+
+## Brand assets
+
+Real logo files, not placeholders:
+
+- **`icons/favicon.png`** (1600×1600, opaque white background) — the app icon: browser
+  tab favicon, PWA manifest icon, and `apple-touch-icon` on every page.
+- **`img/logo.png`** (1080×1080, transparent background) — the full "Subtle Accessories"
+  wordmark + tagline. Used on the login screen and at the top of the printed receipt.
+- **`img/Subtle Accessories.svg`** — an alternate version of the wordmark on a **black**
+  background, not currently used anywhere. Every page here is light-themed, so there's no
+  dark surface for it to sit on yet; it's kept in case a dark-themed context (a dark mode
+  toggle, a dark marketing page, etc.) comes up later.
 
 ## Known limitation
 

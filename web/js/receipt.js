@@ -17,7 +17,7 @@ export function showReceipt({ sale, lines, locationName, cashierName }) {
 
   overlay.innerHTML = `
     <div class="receipt-paper">
-      <h2>SUBTLE ACCESSORIES</h2>
+      <img src="img/logo.png" alt="Subtle Accessories" class="receipt-logo" />
       <p class="tagline">${locationName ?? ''}</p>
       <hr />
       <div class="receipt-line"><span>Receipt #</span><span>${shortId}</span></div>
