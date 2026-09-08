@@ -6,6 +6,7 @@ import { initSyncListeners, replayOutbox } from './sync.js';
 import { renderNav } from './nav.js';
 import { registerServiceWorker } from './pwa.js';
 import { showReceipt } from './receipt.js';
+import { logActivity } from './activity.js';
 
 // MVP simplification, flagged in the README: one currency and one payment method per sale.
 // Split/multi-currency tender (sale_payments supports it) is a stretch goal, not built yet.
@@ -25,6 +26,14 @@ let saleType = 'retail';
 let locationName = '';
 let balancesByVariant = {}; // variant_id -> quantity_available at the CURRENT location, display-only
 
+// STEP 9 (promotions): a manual discount above this cap needs a manager's PIN, verified
+// against verify_manager_pin() at checkout time so the approving manager's id (not the PIN
+// itself) can be recorded on the sale. Defaults to $20 if app_settings can't be reached
+// (e.g. offline) -- a conservative fallback that just means PIN entry is asked for slightly
+// more often than strictly necessary, never less.
+let manualDiscountCapCents = 2000;
+let appliedDiscountCode = null; // the matched discount_codes row, or null
+
 async function init() {
   registerServiceWorker();
 
@@ -35,6 +44,7 @@ async function init() {
 
   await loadProducts();
   await loadLocationName();
+  await loadDiscountCap();
   renderProductGrid();
   wireControls();
 
@@ -125,6 +135,72 @@ async function loadLocationName() {
   } catch {
     locationName = '';
   }
+}
+
+async function loadDiscountCap() {
+  try {
+    const client = getClient();
+    const { data } = await client.from('app_settings').select('key, value').eq('key', 'manual_discount_cap_cents');
+    if (data?.[0]?.value != null) manualDiscountCapCents = Number(data[0].value);
+  } catch {
+    // keep the conservative default set above
+  }
+}
+
+// A code is looked up fresh from the server rather than cached, same reasoning as
+// resolveCustomerId below -- it needs an authoritative is_active/valid_until check, so
+// there's no safe offline fallback. Unlike the customer lookup, though, skipping a discount
+// isn't harmless to silently do -- so applying a code is simply unavailable while offline.
+async function handleApplyDiscountCode() {
+  const input = document.getElementById('discount-code-input');
+  const status = document.getElementById('discount-code-status');
+  const code = input.value.trim().toUpperCase();
+  status.textContent = '';
+  appliedDiscountCode = null;
+
+  if (!code) {
+    renderTotals();
+    return;
+  }
+  if (!navigator.onLine) {
+    status.textContent = 'Discount codes need an internet connection to verify.';
+    renderTotals();
+    return;
+  }
+
+  try {
+    const client = getClient();
+    const { data } = await client.from('discount_codes').select('*').eq('code', code);
+    const row = data?.[0];
+    const now = new Date();
+    if (!row || !row.is_active) {
+      status.textContent = 'That code is not valid.';
+    } else if (row.valid_from && new Date(row.valid_from) > now) {
+      status.textContent = 'That code is not active yet.';
+    } else if (row.valid_until && new Date(row.valid_until) < now) {
+      status.textContent = 'That code has expired.';
+    } else {
+      const subtotalCents = cart.reduce((sum, l) => sum + currentPriceCents(l.product) * l.quantity, 0);
+      if (row.min_spend_cents && subtotalCents < row.min_spend_cents) {
+        status.textContent = `Needs a minimum spend of ${formatCents(row.min_spend_cents, 'USD')}.`;
+      } else {
+        appliedDiscountCode = row;
+        status.textContent = `Code "${row.code}" applied.`;
+      }
+    }
+  } catch (err) {
+    status.textContent = err.message ?? 'Could not check that code.';
+  }
+  renderTotals();
+}
+
+function discountCodeCents(subtotalCents) {
+  if (!appliedDiscountCode) return 0;
+  const raw =
+    appliedDiscountCode.discount_type === 'percentage'
+      ? Math.round((subtotalCents * appliedDiscountCode.discount_value) / 100)
+      : appliedDiscountCode.discount_value;
+  return Math.min(subtotalCents, raw);
 }
 
 function currentPriceCents(product) {
@@ -295,13 +371,15 @@ function renderCart() {
 
 function renderTotals() {
   const subtotalCents = cart.reduce((sum, l) => sum + currentPriceCents(l.product) * l.quantity, 0);
-  const discountCents = Math.max(0, toCents(document.getElementById('cart-discount').value || 0));
+  const manualDiscountCents = Math.max(0, toCents(document.getElementById('cart-discount').value || 0));
+  const totalDiscountCents = Math.min(subtotalCents, manualDiscountCents + discountCodeCents(subtotalCents));
   const taxCents = Math.max(0, toCents(document.getElementById('cart-tax').value || 0));
-  const totalCents = Math.max(0, subtotalCents - discountCents + taxCents);
+  const totalCents = Math.max(0, subtotalCents - totalDiscountCents + taxCents);
   const currency = cart[0]?.product.currency ?? 'USD';
 
   document.getElementById('cart-subtotal').textContent = formatCents(subtotalCents, currency);
   document.getElementById('cart-total').textContent = formatCents(totalCents, currency);
+  document.getElementById('manager-pin-row').hidden = manualDiscountCents <= manualDiscountCapCents;
 
   const belowMinimum =
     saleType === 'wholesale' && cart.some((l) => l.quantity < (l.product.min_wholesale_qty ?? 1));
@@ -322,6 +400,7 @@ function wireControls() {
 
   document.getElementById('cart-discount').addEventListener('input', renderTotals);
   document.getElementById('cart-tax').addEventListener('input', renderTotals);
+  document.getElementById('apply-discount-code-btn').addEventListener('click', handleApplyDiscountCode);
 
   document.getElementById('type-retail').addEventListener('click', () => setSaleType('retail'));
   document.getElementById('type-wholesale').addEventListener('click', () => setSaleType('wholesale'));
@@ -367,10 +446,40 @@ async function completeSale() {
 
   const currency = cart[0].product.currency ?? 'USD';
   const subtotalCents = cart.reduce((sum, l) => sum + currentPriceCents(l.product) * l.quantity, 0);
-  const discountCents = Math.max(0, toCents(document.getElementById('cart-discount').value || 0));
+  const manualDiscountCents = Math.max(0, toCents(document.getElementById('cart-discount').value || 0));
   const taxCents = Math.max(0, toCents(document.getElementById('cart-tax').value || 0));
-  const totalCents = Math.max(0, subtotalCents - discountCents + taxCents);
   const paymentMethod = document.getElementById('payment-method').value;
+
+  // A manual discount above the cap needs a manager's PIN -- verified here (not just
+  // hidden/shown in the UI) so bypassing the input can't skip the check. Resolves to the
+  // approving manager's own id, which gets recorded on the sale; the PIN itself never does.
+  let approvingManagerId = null;
+  if (manualDiscountCents > manualDiscountCapCents) {
+    if (!navigator.onLine) {
+      errorEl.textContent = 'This discount needs manager approval, which requires an internet connection to verify.';
+      return;
+    }
+    const pin = document.getElementById('manager-pin-input').value.trim();
+    if (!pin) {
+      errorEl.textContent = 'Enter the manager PIN to approve this discount.';
+      return;
+    }
+    const { data: managerId, error: pinError } = await getClient().rpc('verify_manager_pin', { p_pin: pin });
+    if (pinError || !managerId) {
+      errorEl.textContent = 'That manager PIN was not recognized.';
+      return;
+    }
+    approvingManagerId = managerId;
+    await logActivity(
+      profile,
+      'manual_discount_approved',
+      `A manager approved a manual discount of ${formatCents(manualDiscountCents, currency)} for ${profile.full_name}'s sale`,
+      { approved_by: approvingManagerId, amount_cents: manualDiscountCents }
+    );
+  }
+
+  const discountCents = Math.min(subtotalCents, manualDiscountCents + discountCodeCents(subtotalCents));
+  const totalCents = Math.max(0, subtotalCents - discountCents + taxCents);
   const customerId = navigator.onLine ? await resolveCustomerId(getClient()) : null;
 
   const saleId = crypto.randomUUID();
@@ -387,6 +496,8 @@ async function completeSale() {
     tax_cents: taxCents,
     total_cents: totalCents,
     customer_id: customerId,
+    discount_code: appliedDiscountCode?.code ?? null,
+    discount_approved_by: approvingManagerId,
     created_at: nowIso, // the sale's OWN moment -- what the cost-snapshot trigger keys off
   };
 
@@ -455,9 +566,21 @@ async function completeSale() {
     unitPriceCents: currentPriceCents(line.product),
   }));
 
+  await logActivity(
+    profile,
+    'sale',
+    `${profile.full_name} completed a ${saleType} sale of ${formatCents(totalCents, currency)}`,
+    { sale_id: saleId, total_cents: totalCents, currency, item_count: items.length }
+  );
+
   cart = [];
+  appliedDiscountCode = null;
   document.getElementById('cart-discount').value = 0;
   document.getElementById('cart-tax').value = 0;
+  document.getElementById('discount-code-input').value = '';
+  document.getElementById('discount-code-status').textContent = '';
+  document.getElementById('manager-pin-input').value = '';
+  document.getElementById('manager-pin-row').hidden = true;
   document.getElementById('customer-name').value = '';
   document.getElementById('customer-phone').value = '';
   renderCart();

@@ -5,6 +5,7 @@ import { renderNav } from './nav.js';
 import { registerServiceWorker } from './pwa.js';
 import { resizeImage } from './image.js';
 import { printLabels } from './labels.js';
+import { logActivity } from './activity.js';
 
 // Manager/owner only -- RLS enforces this independently (products/product_variants/
 // product_prices writes all require is_manager_or_owner(), and product_cost_history is
@@ -33,8 +34,11 @@ async function init() {
 
   document.querySelector('input[name="photo"]').addEventListener('change', previewPhoto);
   document.getElementById('product-form').addEventListener('submit', handleCreateProduct);
+  document.getElementById('discount-code-form').addEventListener('submit', handleCreateDiscountCode);
+  document.getElementById('pin-form').addEventListener('submit', handleSetManagerPin);
 
   await renderProductList();
+  await renderDiscountCodesList();
 }
 
 function previewPhoto(event) {
@@ -96,11 +100,17 @@ async function handleCreateProduct(event) {
       is_active: true,
     });
 
+    // id and effective_date both carry DB defaults (gen_random_uuid()/now()) in the real
+    // schema, which the demo mock does not replicate -- set them explicitly so a second
+    // product's price/cost rows don't collide with the first's under the mock's
+    // upsert-by-id dedup (see mockClient.js's applyWrite), and so "latest by effective_date"
+    // ordering is meaningful instead of comparing undefined to undefined.
+    const priceEffectiveDate = new Date().toISOString();
     const priceRows = [
-      { product_id: productId, price_type: 'retail', unit_price_cents: toCents(form.retail_price.value), currency },
+      { id: crypto.randomUUID(), product_id: productId, price_type: 'retail', unit_price_cents: toCents(form.retail_price.value), currency, effective_date: priceEffectiveDate },
     ];
     if (form.wholesale_price.value) {
-      priceRows.push({ product_id: productId, price_type: 'wholesale', unit_price_cents: toCents(form.wholesale_price.value), currency });
+      priceRows.push({ id: crypto.randomUUID(), product_id: productId, price_type: 'wholesale', unit_price_cents: toCents(form.wholesale_price.value), currency, effective_date: priceEffectiveDate });
     }
     await client.from('product_prices').insert(priceRows);
 
@@ -109,10 +119,12 @@ async function handleCreateProduct(event) {
     // per-variant, added below via "add a variant").
     const supplierId = await getOrCreateManualSupplier(client);
     await client.from('product_cost_history').insert({
+      id: crypto.randomUUID(),
       product_id: productId,
       supplier_id: supplierId,
       unit_cost_cents: toCents(form.cost_price.value),
       currency,
+      effective_date: priceEffectiveDate,
     });
 
     const photoFile = form.photo.files?.[0];
@@ -122,6 +134,7 @@ async function handleCreateProduct(event) {
     }
 
     successEl.textContent = `${form.name.value.trim()} added — now add at least one variant below so it can be sold.`;
+    await logActivity(profile, 'product_created', `${profile.full_name} created product "${form.name.value.trim()}"`, { product_id: productId });
     form.reset();
     document.getElementById('photo-preview').innerHTML = '';
     expandedProductId = productId;
@@ -137,7 +150,8 @@ async function updatePrice(productId, priceType, currency, valueInput) {
   const client = getClient();
   const cents = toCents(valueInput);
   if (!Number.isFinite(cents) || cents < 0) return;
-  await client.from('product_prices').insert({ product_id: productId, price_type: priceType, unit_price_cents: cents, currency });
+  await client.from('product_prices').insert({ id: crypto.randomUUID(), product_id: productId, price_type: priceType, unit_price_cents: cents, currency, effective_date: new Date().toISOString() });
+  await logActivity(profile, 'price_updated', `${profile.full_name} updated the ${priceType} price to ${formatCents(cents, currency)}`, { product_id: productId, price_type: priceType, unit_price_cents: cents });
   await renderProductList();
 }
 
@@ -164,6 +178,8 @@ async function handleAddVariant(product, form) {
     const barcode = form.barcode.value.trim() || null;
     const locationId = form.location_id.value;
     const quantity = Number(form.initial_qty.value) || 0;
+    const reorderThresholdInput = form.reorder_threshold.value.trim();
+    const reorderThreshold = reorderThresholdInput ? Number(reorderThresholdInput) : null;
 
     if (!sku) throw new Error('SKU is required.');
 
@@ -175,6 +191,7 @@ async function handleAddVariant(product, form) {
       sku,
       barcode,
       is_active: true,
+      reorder_threshold: reorderThreshold,
     });
 
     if (quantity > 0) {
@@ -207,6 +224,13 @@ async function handleAddVariant(product, form) {
       });
     }
 
+    await logActivity(
+      profile,
+      'stock_change',
+      `${profile.full_name} added variant ${sku} to "${product.name}"${quantity > 0 ? ` with ${quantity} units` : ''}`,
+      { product_id: product.id, variant_id: variantId, initial_qty: quantity }
+    );
+
     expandedProductId = product.id;
     await renderProductList();
   } catch (err) {
@@ -237,6 +261,7 @@ function renderVariantAddForm(product) {
         <select name="location_id">${locations.map((l) => `<option value="${l.id}">${l.name}</option>`).join('')}</select>
       </label>
       <label>Initial qty <input type="number" name="initial_qty" min="0" step="1" value="0" /></label>
+      <label>Reorder at <input type="number" name="reorder_threshold" min="0" step="1" placeholder="optional" /></label>
       <button type="submit" class="primary">Add variant</button>
       <p class="error variant-error" style="grid-column: 1 / -1;"></p>
     </form>
@@ -297,10 +322,11 @@ async function renderProductList() {
                 <td>${v.sku}</td>
                 <td>${v.barcode ?? '—'}</td>
                 <td>${stockByLoc || '0'}</td>
+                <td>${v.reorder_threshold ?? '—'}</td>
                 <td><button type="button" class="ghost print-label-btn" data-product-id="${p.id}" data-variant-id="${v.id}">Print label</button></td>
               </tr>`;
             })
-            .join('') || '<tr><td colspan="6" style="color: var(--text-muted);">No variants yet — this product cannot be sold until one exists.</td></tr>';
+            .join('') || '<tr><td colspan="7" style="color: var(--text-muted);">No variants yet — this product cannot be sold until one exists.</td></tr>';
 
         return `
         <div class="card product-card">
@@ -319,7 +345,7 @@ async function renderProductList() {
               <button type="button" class="ghost save-price-btn" data-id="${p.id}" data-currency="${currency}">Update price</button>
             </div>
             <table class="variant-table">
-              <thead><tr><th>Size</th><th>Color</th><th>SKU</th><th>Barcode</th><th>Stock by location</th><th></th></tr></thead>
+              <thead><tr><th>Size</th><th>Color</th><th>SKU</th><th>Barcode</th><th>Stock by location</th><th>Reorder at</th><th></th></tr></thead>
               <tbody>${variantRows}</tbody>
             </table>
             ${productVariants.length > 0 ? `<button type="button" class="ghost print-all-labels-btn" data-id="${p.id}">Print all labels for this product</button>` : ''}
@@ -387,6 +413,123 @@ async function renderProductList() {
       handleAddVariant(product, form);
     });
   });
+}
+
+// STEP 9 of the fashion-retail evolution (promotions). Any manager/owner can create/toggle
+// codes -- RLS on discount_codes mirrors the products tables (is_manager_or_owner()).
+// Values are stored as cents/whole-percent under the hood but entered as dollars/percent
+// here, same convention as product prices.
+async function renderDiscountCodesList() {
+  const client = getClient();
+  const { data: codes } = await client.from('discount_codes').select('*').order('created_at', { ascending: false });
+  const tbody = document.getElementById('discount-code-list-body');
+
+  tbody.innerHTML =
+    (codes ?? [])
+      .map((c) => {
+        const value = c.discount_type === 'percentage' ? `${c.discount_value}%` : formatCents(c.discount_value, 'USD');
+        const minSpend = c.min_spend_cents ? formatCents(c.min_spend_cents, 'USD') : '—';
+        const validUntil = c.valid_until ? new Date(c.valid_until).toLocaleDateString() : '—';
+        return `
+        <tr>
+          <td>${c.code}</td>
+          <td>${c.discount_type}</td>
+          <td>${value}</td>
+          <td>${minSpend}</td>
+          <td>${validUntil}</td>
+          <td>${c.is_active ? 'Yes' : 'No'}</td>
+          <td><button type="button" class="ghost toggle-discount-btn" data-id="${c.id}" data-active="${c.is_active}">${c.is_active ? 'Deactivate' : 'Activate'}</button></td>
+        </tr>`;
+      })
+      .join('') || '<tr><td colspan="7" style="color: var(--text-muted);">No discount codes yet.</td></tr>';
+
+  tbody.querySelectorAll('.toggle-discount-btn').forEach((btn) => {
+    btn.addEventListener('click', () => handleToggleDiscountCode(btn.dataset.id, btn.dataset.active === 'true'));
+  });
+}
+
+async function handleCreateDiscountCode(event) {
+  event.preventDefault();
+  const form = event.target;
+  const errorEl = document.getElementById('discount-code-error');
+  errorEl.textContent = '';
+  const submitBtn = form.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+
+  try {
+    const client = getClient();
+    const code = form.code.value.trim().toUpperCase();
+    const discountType = form.discount_type.value;
+    // Percentage is a whole-number percent (e.g. 10 = 10%); fixed amount is a dollar value
+    // converted to cents -- same unit-storage split discount_type implies in the migration.
+    const discountValue = discountType === 'percentage' ? Number(form.discount_value.value) : toCents(form.discount_value.value);
+    const minSpend = form.min_spend.value ? toCents(form.min_spend.value) : null;
+    const validUntil = form.valid_until.value || null;
+
+    if (!code) throw new Error('Code is required.');
+
+    await client.from('discount_codes').insert({
+      id: crypto.randomUUID(),
+      code,
+      discount_type: discountType,
+      discount_value: discountValue,
+      min_spend_cents: minSpend,
+      valid_until: validUntil,
+      is_active: true,
+      created_by: profile.id,
+      created_at: new Date().toISOString(),
+    });
+
+    await logActivity(profile, 'discount_code_created', `${profile.full_name} created discount code ${code}`, { code });
+    form.reset();
+    await renderDiscountCodesList();
+  } catch (err) {
+    errorEl.textContent = err.message ?? String(err);
+  } finally {
+    submitBtn.disabled = false;
+  }
+}
+
+async function handleToggleDiscountCode(id, currentlyActive) {
+  const client = getClient();
+  await client.from('discount_codes').update({ is_active: !currentlyActive }).eq('id', id);
+  await logActivity(profile, 'discount_code_updated', `${profile.full_name} ${currentlyActive ? 'deactivated' : 'activated'} a discount code`, { discount_code_id: id });
+  await renderDiscountCodesList();
+}
+
+// Self-service PIN: a manager/owner sets their OWN pin (updates their own user_profiles
+// row), never someone else's -- there's no "set another user's PIN" UI, deliberately, since
+// verify_manager_pin() only needs to know a PIN belongs to *some* manager/owner, not which
+// row set it from where.
+async function handleSetManagerPin(event) {
+  event.preventDefault();
+  const form = event.target;
+  const errorEl = document.getElementById('pin-error');
+  const successEl = document.getElementById('pin-success');
+  errorEl.textContent = '';
+  successEl.textContent = '';
+  const submitBtn = form.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+
+  try {
+    const pin = form.pin.value.trim();
+    if (!/^[0-9]{4,6}$/.test(pin)) throw new Error('PIN must be 4-6 digits.');
+
+    const client = getClient();
+    const { error } = await client.from('user_profiles').update({ manager_pin: pin }).eq('id', profile.id);
+    if (error) throw error;
+
+    successEl.textContent = 'PIN saved.';
+    form.reset();
+  } catch (err) {
+    // The partial unique index on user_profiles.manager_pin surfaces as a generic
+    // constraint-violation error from Postgres -- give the manager a plain-language reason
+    // rather than a raw DB error, since "someone else already has this PIN" is the only
+    // realistic cause.
+    errorEl.textContent = /unique|duplicate/i.test(err.message ?? '') ? 'That PIN is already in use — choose a different one.' : (err.message ?? String(err));
+  } finally {
+    submitBtn.disabled = false;
+  }
 }
 
 init();

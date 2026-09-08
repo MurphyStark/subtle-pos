@@ -1,8 +1,13 @@
 # Subtle POS
 
-Offline-first POS + inventory system for Subtle Accessories (Zimbabwe, two stock
-locations). Source spec: `../subtle pos prd v2 and build prompt.md` (a PRD-addendum + VS
-Code build prompt — not the full original PRD; see the gap noted below).
+Offline-first POS + inventory system for Subtle Accessories (Zimbabwe). Originally built
+around two stock locations (a retail shop and a "Home / Wholesale Store"); collapsed to a
+**single location** during the fashion-retail evolution (see below) at the user's explicit
+direction — wholesale as a *pricing tier* (retail vs. wholesale price, minimum wholesale
+quantity) is unaffected and still fully supported, only the second physical location and
+inter-location transfers were removed. Source spec: `../subtle pos prd v2 and build
+prompt.md` (a PRD-addendum + VS Code build prompt — not the full original PRD; see the gap
+noted below).
 
 ## Stack deviation from the build prompt
 
@@ -79,6 +84,25 @@ table/field-name parity. Places most likely to drift from the source document:
   Thermal printing (`web/js/thermal-print.js`) uses WebUSB + ESC/POS and is **untested
   against real hardware** — no printer was available to verify against; the byte sequence
   follows the spec, but a specific printer model may need endpoint/vendor adjustments.
+- **The second stock location was removed entirely, not just hidden.** The user was asked
+  explicitly (destructive/hard-to-reverse change) and chose to collapse to one location
+  rather than keep it dormant. `20260901091500_remove_wholesale_location.sql` merges the
+  wholesale location's stock into the shop location (same weighted-average-cost blend used
+  everywhere else in this schema), reassigns any `user_profiles.primary_location_id`
+  pointing at it, then deletes the location row. It assumes no real Supabase project has
+  ever taken live transactional data (documented in the migration itself) — a deployment
+  with real sales/receipts/counts/POs already referencing that location would hit FK
+  violations on the final `delete`, and would need a manual data migration first, not just
+  this script.
+- **Manager PIN approval returns an id, not a boolean.** `verify_manager_pin(p_pin)` returns
+  the approving manager/owner's `uuid` (or `null`), never the PIN itself or a plain
+  true/false — a boolean couldn't record *which* manager approved a discount, and the RPC
+  needs to work for a cashier's device that structurally cannot read `user_profiles.manager_pin`
+  directly (same masking philosophy as `unit_cost_at_sale_cents` above). A partial unique
+  index (`where manager_pin is not null`) stops two managers from ever sharing one PIN.
+- **Discount codes are global**, not per-location or per-product — `discount_codes` has no
+  location/product scoping columns. Revisit if per-product promotions are needed later; the
+  table's shape would need to change, not just its data.
 
 ## Layout
 
@@ -105,12 +129,19 @@ No Supabase project exists yet for Subtle POS. To stand this up:
 
 ## What's next
 
-The project is now also mid-way through an 11-step fashion-retail evolution (size/color
-variants, purchase orders, returns, promotions, reporting, low-stock alerts) reviewed one
-step at a time — see `web/README.md`'s "Fashion-retail evolution" section for exact status.
-Steps 1–8 are done: data model, admin (product + variant creation), barcode labels,
-checkout (variant picker + exact-barcode-scan resolution), purchase orders & transfers,
-returns, receipts (WhatsApp/email/thermal-print additions — thermal untested against real
-hardware), and customers. Still ahead: promotions, reporting, and low-stock alerts
-(steps 9–11) — see `web/README.md`'s "Fashion-retail evolution" section for exactly what
-each finished step does and doesn't cover.
+The 11-step fashion-retail evolution (size/color variants, purchase orders, returns,
+promotions, reporting, low-stock alerts) is **now complete** — see `web/README.md`'s
+"Fashion-retail evolution" section for exactly what each step does and doesn't cover. The
+final batch (steps 9–11) also bundled five additional requirements from the same request:
+a full Reports & Analytics page (`reports.html`), removal of the second stock location
+(wholesale as a *pricing tier* is unaffected — see the judgment-calls section above),
+offline support extended to stock takes and returns (checkout already had it), an Excel
+(`.xlsx`) export of the core tables for backup/analysis, and staff presence + a full
+activity log (`activity.html`). See `web/README.md` for the details and scope notes on each.
+
+Two pre-existing bugs were found and fixed while building this batch (not introduced by it,
+but blocking correct behavior for reporting and returns) — see `web/README.md`'s "Bugs found
+and fixed this pass" section: `product_prices`/`product_cost_history` inserts colliding
+under the demo mock's dedup logic (silently dropping a second product's price/cost), and
+`v_sale_items` never being wired up in the mock at all (returns always saw an empty list,
+and no line ever carried COGS/profit).

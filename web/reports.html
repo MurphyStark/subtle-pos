@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Subtle POS — Reports</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="icons/favicon.png" />
+  <link rel="apple-touch-icon" href="icons/favicon.png" />
+  <meta name="theme-color" content="#17563b" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <nav id="app-nav"></nav>
+
+  <main>
+    <h1>Reports &amp; Analytics</h1>
+    <div class="card">
+      <div class="form-grid">
+        <label>From <input type="date" id="range-from" /></label>
+        <label>To <input type="date" id="range-to" /></label>
+      </div>
+      <div class="sale-type-toggle" style="margin-top: 0.5rem;">
+        <button type="button" id="preset-today">Today</button>
+        <button type="button" id="preset-week">This week</button>
+        <button type="button" id="preset-month" class="active">This month</button>
+      </div>
+      <button type="button" id="export-btn" class="ghost" style="margin-top: 0.5rem;">Export to Excel</button>
+    </div>
+
+    <div id="summary-cards"></div>
+
+    <h1 style="margin-top: 1.5rem;">Sales over time</h1>
+    <div class="card">
+      <div class="sale-type-toggle">
+        <button type="button" id="granularity-daily" class="active">Daily</button>
+        <button type="button" id="granularity-weekly">Weekly</button>
+        <button type="button" id="granularity-monthly">Monthly</button>
+      </div>
+      <div id="period-table"></div>
+    </div>
+
+    <h1 style="margin-top: 1.5rem;">Product performance</h1>
+    <p style="color: var(--text-muted); margin-top: -0.5rem;">For the date range selected above, best sellers first.</p>
+    <div class="card">
+      <div id="product-performance-table"></div>
+    </div>
+
+    <h1 style="margin-top: 1.5rem;">Monthly detail by product</h1>
+    <div class="card">
+      <label>Month <input type="month" id="monthly-detail-month" /></label>
+      <div id="monthly-detail-table" style="margin-top: 0.5rem;"></div>
+    </div>
+
+    <h1 style="margin-top: 1.5rem;">Z-report (cash reconciliation)</h1>
+    <p style="color: var(--text-muted); margin-top: -0.5rem;">Totals by payment method for a single day, net of that day's refunds.</p>
+    <div class="card">
+      <label>Date <input type="date" id="z-report-date" /></label>
+      <div id="z-report-table" style="margin-top: 0.5rem;"></div>
+    </div>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script type="module" src="js/reports.js"></script>
+</body>
+</html>

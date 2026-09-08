@@ -3,11 +3,20 @@ import { getClient } from './supabaseClient.js';
 import { formatCents } from './money.js';
 import { renderNav } from './nav.js';
 import { registerServiceWorker } from './pwa.js';
+import { queueOutbox, countPendingOutbox } from './db.js';
+import { initSyncListeners, replayOutbox } from './sync.js';
+import { logActivity } from './activity.js';
 
 // STEP 6 of the fashion-retail evolution. Any authenticated role may process a return
 // (RLS: sale_item_returns_insert has no role restriction); sales visibility is already
 // scoped by sales_select (own location, or any location for managers/owner) -- a return
 // can only ever be raised against a sale this account can already see.
+//
+// Offline-capable, same pattern as checkout and stock-take: a return that fails to reach
+// Supabase (or is attempted while already offline) queues in IndexedDB and replays once
+// back online -- a customer standing at the counter with a return shouldn't be turned away
+// for a dead connection any more than a sale should. Search itself still needs a live
+// connection (it reads from the server), but the actual PROCESS-return write does not.
 let profile = null;
 let selectedSale = null;
 
@@ -20,6 +29,24 @@ async function init() {
   renderNav(profile);
 
   document.getElementById('search-btn').addEventListener('click', runSearch);
+
+  initSyncListeners(refreshStatusBanner);
+  window.addEventListener('online', refreshStatusBanner);
+  window.addEventListener('offline', refreshStatusBanner);
+  await refreshStatusBanner();
+}
+
+async function refreshStatusBanner() {
+  const pending = await countPendingOutbox();
+  const banner = document.getElementById('status-banner');
+  if (!banner) return;
+  if (pending === 0) {
+    banner.innerHTML = '';
+  } else if (!navigator.onLine) {
+    banner.innerHTML = `<div class="status-banner offline">Offline — ${pending} return${pending === 1 ? '' : 's'} queued and will sync once you're back online.</div>`;
+  } else {
+    banner.innerHTML = `<div class="status-banner pending">Syncing ${pending} queued return${pending === 1 ? '' : 's'}…</div>`;
+  }
 }
 
 async function runSearch() {
@@ -82,6 +109,12 @@ async function runSearch() {
   });
 }
 
+// KNOWN LIMITATION: "already returned" quantity comes from the server's
+// v_sale_item_returns, so a return that's queued offline (not yet synced) isn't reflected
+// here until it lands -- processing two returns against the same line before the first one
+// syncs could double up. Accepted for now: the scenario needs the same line item returned
+// twice inside one offline window, and the server-side quantity validation (identical
+// online or replayed from the queue) still catches it once both entries eventually sync.
 async function renderReturnDetail() {
   const client = getClient();
   const detail = document.getElementById('return-detail');
@@ -168,29 +201,55 @@ async function handleProcessReturn(form, rowData) {
   const submitBtn = form.querySelector('button[type="submit"]');
   submitBtn.disabled = true;
 
+  const quantity = Number(form.quantity.value);
+  const unitPrice = rowData.item.unit_selling_price_cents;
+  const returnId = crypto.randomUUID();
+  const returnRow = {
+    id: returnId,
+    sale_item_id: rowData.item.id,
+    quantity_returned: quantity,
+    reason: form.reason.value,
+    refund_method: form.refund_method.value,
+    refund_amount_cents: quantity * unitPrice,
+    processed_by: profile.id,
+    sync_status: 'synced',
+    created_at: new Date().toISOString(), // explicit, not relying on the column's DB DEFAULT now() -- see purchase-orders.js's note
+  };
+
   try {
-    const client = getClient();
-    const quantity = Number(form.quantity.value);
-    const unitPrice = rowData.item.unit_selling_price_cents;
-
-    const { error } = await client.from('sale_item_returns').insert({
-      id: crypto.randomUUID(),
-      sale_item_id: rowData.item.id,
-      quantity_returned: quantity,
-      reason: form.reason.value,
-      refund_method: form.refund_method.value,
-      refund_amount_cents: quantity * unitPrice,
-      processed_by: profile.id,
-      sync_status: 'synced',
-      created_at: new Date().toISOString(), // explicit, not relying on the column's DB DEFAULT now() -- see purchase-orders.js's note
-    });
-    if (error) throw error;
-
-    await renderReturnDetail();
+    if (navigator.onLine) {
+      const client = getClient();
+      const { error } = await client.from('sale_item_returns').insert(returnRow);
+      if (error) throw error;
+    } else {
+      throw new Error('offline'); // fall through to the offline queue below
+    }
   } catch (err) {
-    errorEl.textContent = err.message ?? String(err);
-    submitBtn.disabled = false;
+    // An online-but-failed attempt could mean the quantity was already invalid (someone
+    // else returned the same line first) rather than a real connectivity problem -- but
+    // there's no way to tell those apart from a plain network error here, and the customer
+    // is standing at the counter, so queue it and let the server-side validation (which
+    // runs identically once this syncs) be the final word rather than blocking on it now.
+    await queueOutbox({
+      id: returnId,
+      entity_type: 'sale_item_return',
+      entity_id: returnId,
+      status: 'pending',
+      created_at: returnRow.created_at,
+      payload: { returnRow },
+    });
   }
+
+  await logActivity(
+    profile,
+    'refund',
+    `${profile.full_name} processed a return of ${quantity} unit${quantity === 1 ? '' : 's'} (${form.reason.value}, ${form.refund_method.value})`,
+    { return_id: returnId, sale_item_id: rowData.item.id, quantity_returned: quantity }
+  );
+
+  await renderReturnDetail();
+  await refreshStatusBanner();
+  replayOutbox(refreshStatusBanner);
 }
 
 init();

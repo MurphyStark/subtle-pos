@@ -1,8 +1,14 @@
 // Replays the local outbox in order once the device is back online. This is the client
-// half of PRD section 1.2: the sale already happened locally (client-generated UUID,
+// half of PRD section 1.2: the action already happened locally (client-generated UUID,
 // optimistic local record); this just pushes it to Supabase, which is authoritative for
 // stock/cost reconciliation once the row lands (see fn_apply_sale_item_inventory_impact
 // and fn_populate_sale_item_cost_snapshot in the sales_and_returns migration).
+//
+// Handles three entity types -- sales (checkout), stock_count (a completed stock take),
+// and sale_item_return (a processed return) -- the three "shop floor, must work with no
+// signal" actions. Purchase orders, transfers-that-no-longer-exist, product/variant admin,
+// and customer creation are deliberately left online-only: those are manager-initiated
+// back-office actions, not "a customer is standing at the till right now" moments.
 
 import { getClient } from './supabaseClient.js';
 import { getPendingOutbox, markOutboxSynced } from './db.js';
@@ -33,6 +39,33 @@ async function pushSale(client, { sale, items, payments }) {
   }
 }
 
+async function pushStockCount(client, { stockCount, items }) {
+  // Draft first, items second, THEN flip to completed -- the same order stock-take.js uses
+  // online, so the completion trigger (which reads stock_count_items) sees them.
+  const { error: countError } = await client
+    .from('stock_counts')
+    .upsert({ ...stockCount, status: 'draft' }, { onConflict: 'id', ignoreDuplicates: true });
+  if (countError) throw countError;
+
+  const { error: itemsError } = await client
+    .from('stock_count_items')
+    .upsert(items.map((item) => ({ ...item, stock_count_id: stockCount.id })), { onConflict: 'id', ignoreDuplicates: true });
+  if (itemsError) throw itemsError;
+
+  const { error: statusError } = await client
+    .from('stock_counts')
+    .update({ status: 'completed', completed_at: stockCount.completed_at })
+    .eq('id', stockCount.id);
+  if (statusError) throw statusError;
+}
+
+async function pushSaleItemReturn(client, { returnRow }) {
+  const { error } = await client
+    .from('sale_item_returns')
+    .upsert(returnRow, { onConflict: 'id', ignoreDuplicates: true });
+  if (error) throw error;
+}
+
 export async function replayOutbox(onProgress) {
   if (syncing || !navigator.onLine) return;
   syncing = true;
@@ -45,6 +78,10 @@ export async function replayOutbox(onProgress) {
       try {
         if (entry.entity_type === 'sale') {
           await pushSale(client, entry.payload);
+        } else if (entry.entity_type === 'stock_count') {
+          await pushStockCount(client, entry.payload);
+        } else if (entry.entity_type === 'sale_item_return') {
+          await pushSaleItemReturn(client, entry.payload);
         }
         await markOutboxSynced(entry.id);
         onProgress?.({ id: entry.id, status: 'synced' });
@@ -52,7 +89,7 @@ export async function replayOutbox(onProgress) {
         console.error('Sync failed for outbox entry', entry.id, err);
         onProgress?.({ id: entry.id, status: 'error', error: err });
         // Left as 'pending' -- retried on the next pass. A row that's genuinely invalid
-        // (e.g. a product deleted since) will keep failing; surfacing that to a manager
+        // (e.g. a variant deleted since) will keep failing; surfacing that to a manager
         // for manual resolution is future work, not handled here yet.
       }
     }

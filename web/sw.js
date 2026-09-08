@@ -1,7 +1,11 @@
 // App-shell cache only: same-origin HTML/CSS/JS so the site loads offline. Supabase API
 // calls and the CDN script are deliberately left alone (`return` below) -- offline handling
 // for those is the IndexedDB outbox in js/db.js + js/sync.js, not a cached HTTP response.
-const CACHE_NAME = 'subtle-pos-shell-v5';
+// v6: the wholesale-location removal deleted transfers.html/js/transfers.js -- caches
+// .addAll() is all-or-nothing, so leaving stale entries here would make EVERY install fail
+// (a single 404 aborts the whole app-shell cache), silently breaking offline support
+// entirely. Added reports/activity, the newest pages.
+const CACHE_NAME = 'subtle-pos-shell-v6';
 const APP_SHELL = [
   './',
   './index.html',
@@ -10,9 +14,10 @@ const APP_SHELL = [
   './admin.html',
   './stock-take.html',
   './purchase-orders.html',
-  './transfers.html',
   './returns.html',
   './customers.html',
+  './reports.html',
+  './activity.html',
   './manifest.webmanifest',
   './css/style.css',
   './js/config.js',
@@ -34,9 +39,11 @@ const APP_SHELL = [
   './js/admin.js',
   './js/stock-take.js',
   './js/purchase-orders.js',
-  './js/transfers.js',
   './js/returns.js',
   './js/customers.js',
+  './js/reports.js',
+  './js/activity.js',
+  './js/activity-page.js',
   './icons/favicon.png',
   './img/logo.png',
 ];

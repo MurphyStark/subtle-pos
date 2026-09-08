@@ -57,12 +57,10 @@ individually. Current status:
   weighted-average cost via the existing trigger. Partial receipts are supported; the PO's
   own status (`sent` → `partially_received` → `received`) is recalculated by the app after
   each receipt, not by a database trigger, since that's workflow status, not financial
-  history. `transfers.html` covers the "simple" stock-transfer flow: request a transfer of
-  a variant between locations (any role can request FROM their own location, matching the
-  RLS already built for this back in the original schema), then a manager/owner can
-  "Approve & mark received" in one step, which snapshots the source location's
-  weighted-average cost onto the transfer and blends it into the destination's average
-  once received.
+  history. `transfers.html` originally covered the "simple" stock-transfer flow between the
+  two locations — **removed** in the steps 9–11 batch when the second location was collapsed
+  into one (see the top-level README's judgment-calls section); with only one location left,
+  a transfer has no destination to move stock to.
 - ✅ **Step 6** (returns): `returns.html` searches past sales by receipt number, date range,
   or customer name/phone, then lets you select a returnable line, capture a reason (wrong
   size, defect, changed mind, other) and a refund method (cash, card, or store credit), and
@@ -87,15 +85,53 @@ individually. Current status:
   `customer_id` to the sale; leaving both blank keeps checkout exactly as it was before this
   step (an anonymous sale). `customers.html` lists/searches customers and shows each one's
   purchase history.
-- Steps 9 (promotions), 10 (reporting), 11 (low-stock alerts) are still ahead.
+- ✅ **Step 9** (promotions): `discount_codes` (percentage or fixed amount, optional min
+  spend, optional expiry, active toggle) managed from `admin.html`. At checkout, `pos.html`
+  splits "discount" into a **discount code** (looked up and validated live against the code's
+  active/date/min-spend rules — requires connectivity, since a stale/offline code check could
+  apply an expired or deactivated code) and a **manual discount**, which above a configurable
+  cap (`app_settings.manual_discount_cap_cents`, default $20, editable only via direct DB/API
+  access right now — no settings UI for it yet) requires a manager's PIN, verified via
+  `verify_manager_pin()` so the approving manager's identity (never the PIN itself) is
+  recorded on the sale (`sales.discount_approved_by`). Managers/owner set their own PIN from
+  a self-service form on `admin.html` (never someone else's — there's no "set another user's
+  PIN" UI, deliberately).
+- ✅ **Step 10** (reporting) plus the request's expanded Reports & Analytics ask:
+  `reports.html` (manager/owner only) covers total sales, total profit, and transactions for
+  a date range (with Today/This week/This month presets); a daily/weekly/monthly sales-over-
+  time table; a product-performance table (units/revenue/profit/margin, best sellers first);
+  a monthly detail table broken down per product; and a Z-report (cash-drawer reconciliation
+  by payment method for a single day, net of that day's refunds). **Every aggregate is
+  grouped by currency**, never summed across USD/ZWG/ZAR, since a blended total across
+  currencies would be meaningless. An "Export to Excel" button on the same page produces a
+  genuine multi-sheet `.xlsx` (Sales, Sale Items, Products, Variants, Customers) via the
+  SheetJS CDN library, covering the raw requirement for "data export, backup, reporting, and
+  analysis" beyond just the on-screen aggregates. Reports are **online-only by design** — they
+  need a complete, current view of sales history, not a possibly-stale local cache, so
+  there's no offline fallback here (unlike checkout/stock-take/returns).
+- ✅ **Step 11** (low-stock alerts): `product_variants.reorder_threshold` (optional, set per
+  variant in `admin.html`). `inventory.html` flags any variant at or below its threshold with
+  a ⚠ badge, a "Show low-stock only" filter, and a "Reorder" link that opens
+  `purchase-orders.html?variant=<id>` with that variant pre-selected in the new-PO form — a
+  variant with no threshold set never flags (no threshold means "not tracked for reordering",
+  not "always fine").
+- The same batch also added **presence + a full activity log**
+  (`activity.html`/`js/activity.js`), not one of the original 11 steps but part of the same
+  request: a heartbeat (`user_profiles.last_seen_at`, updated every 60s from every
+  authenticated page via `nav.js`) drives a "who's online" list (seen in the last 2 minutes =
+  online); an append-only `activity_log` table records logins, logouts, sales, stock changes
+  (variant creation, stock takes, PO receipts), product/price edits, refunds, discount-code
+  changes, manual-discount approvals, and customer creation, each with the acting user and
+  timestamp, filterable by user/action/date range on the same page.
 
 ## Demo mode
 
 `js/config.js` currently still has its placeholder Supabase URL. Rather than that meaning
 nothing works, `js/supabaseClient.js` detects the placeholder and automatically swaps in
 `js/mockClient.js` — a stand-in that implements exactly the subset of the Supabase API this
-app calls (including `.storage.*`), backed by realistic sample data (10 products, both
-locations, four demo accounts — one per role) persisted to `localStorage`. The login page
+app calls (including `.storage.*` and the `verify_manager_pin` RPC), backed by realistic
+sample data (10 products, one stock location, four demo accounts — one per role, two of them
+pre-seeded with a manager PIN) persisted to `localStorage`. The login page
 shows one-click sign-in buttons for each role plus a "Reset demo data" button. Selling
 something in checkout visibly decrements stock on the Inventory page, adding a product in
 Admin (photo included — stored as a data URL in `localStorage` standing in for a real
@@ -145,7 +181,11 @@ with (Supabase Studio's Authentication tab, or `supabase auth` CLI, then insert 
   or a `localStorage`-backed mock in demo mode (see below). Price updates insert a new
   append-only `product_prices` row per the immutability design, never editing the old one.
   Each variant row has a "Print label" button, and each product has a "Print all labels"
-  button, both rendering barcode/price labels via `js/labels.js` (see step 3 above).
+  button, both rendering barcode/price labels via `js/labels.js` (see step 3 above). A
+  variant can optionally carry a **reorder threshold** (see step 11 below). Also on this
+  page: a **discount codes** manager (create/list/toggle active) and a self-service
+  **manager PIN** setter (see step 9 below) — both manager/owner only, like everything else
+  here.
 - **`stock-take.html`** — counts **variants**, not products (a size/color has its own stock,
   so it has its own count). Any role can count their own location; managers/owner can pick
   either. Shows system quantity vs. a counted-quantity input per variant with a live
@@ -153,25 +193,79 @@ with (Supabase Studio's Authentication tab, or `supabase auth` CLI, then insert 
   `stock_count_items` batch and transitions the count to `completed`, which is what
   triggers the reconciliation (`fn_apply_stock_count_completion` in the real schema,
   mirrored in `mockClient.js` for demo mode) that sets `quantity_available` to exactly what
-  was physically counted.
+  was physically counted. **Now offline-capable**: a completed count that fails to reach the
+  server (or is finished while already offline) queues and replays automatically, the same
+  mechanism checkout has always used.
 - **`purchase-orders.html`** — manager/owner only. Raise a PO (supplier — typed name,
   found-or-created — destination location, currency, per-variant lines of quantity +
   expected cost), then record receipts against it (full or partial); each receipt is a real
   `stock_receipts`/`stock_receipt_items` row, so cost/stock update exactly like any other
   receipt in the system. The PO card shows ordered/received/remaining per line and its own
-  status.
-- **`transfers.html`** — any role can request a transfer of a variant from their own
-  location; a manager/owner can "Approve & mark received" in one step. Snapshots the
-  source's weighted-average cost onto the transfer so the destination's average stays
-  correct once it lands.
+  status. Arriving via a "Reorder" link from `inventory.html`'s low-stock badge
+  (`?variant=<id>`) pre-selects that variant in the new-line form.
 - **`returns.html`** — search a sale by receipt #, date range, or customer; process a
   return per line with a reason and refund method, restocking the right variant/location
   and reversing COGS/profit using the sale's original recorded cost. Over-returning is
-  rejected.
+  rejected. **Now offline-capable**: a return that fails to reach the server (or is
+  attempted while already offline) queues the same way a sale does and replays once back
+  online — search itself still needs connectivity (it reads current sales from the server),
+  but processing the return does not.
 - **`customers.html`** — add/search customers, view each one's purchase history.
   `pos.html` gained optional name/phone fields that attach a customer to a sale.
+- **`reports.html`** — manager/owner only. Total sales/profit/transactions for a date range,
+  a daily/weekly/monthly sales table, product performance (best sellers first), a monthly
+  detail table per product, a Z-report (cash reconciliation by payment method for one day),
+  and an "Export to Excel" button producing a multi-sheet `.xlsx`. See step 10 above.
+- **`activity.html`** — manager/owner only. Who's currently online (heartbeat-based, "seen
+  in the last 2 minutes"), plus a filterable log of logins/logouts/sales/stock
+  changes/edits/refunds/discount actions with the acting user and timestamp. See the
+  presence + activity log note above.
 - Every page above ships with a working `mockClient.js` implementation too — none of this
   needs a live Supabase project to try.
+
+## Bugs found and fixed this pass
+
+Not introduced by the steps 9–11 batch, but found while building it and blocking correct
+behavior for reporting/returns — worth flagging since they were silent (no error shown
+anywhere in the UI):
+
+- **`product_prices` and `product_cost_history` inserts collided under the demo mock's
+  dedup logic.** Both tables' `id` column carries a Postgres default
+  (`gen_random_uuid()`) that the mock (`mockClient.js`) doesn't replicate, and `admin.js`'s
+  inserts into these two tables never set `id` explicitly. The mock's upsert path treats two
+  rows with the same `id` — including two rows that both simply lack one, i.e. `undefined
+  === undefined` — as a duplicate and silently drops the second. Net effect: **every product
+  created after the very first one had no retail price row and no cost history row**, making
+  it invisible in `pos.html`'s product grid (filtered out for having no price) and unable to
+  be sold; editing an existing product's price (`updatePrice()`) was equally silently
+  dropped, since it hit the exact same collision. Fixed by having `admin.js` set `id`
+  (`crypto.randomUUID()`) and `effective_date` explicitly on every insert into these two
+  tables, matching the same "explicit rather than relying on a DB default the mock doesn't
+  have" discipline already used elsewhere (see `purchase-orders.js`'s `quantity_received: 0`
+  note). Verified with a Node test creating two products back-to-back and confirming both
+  keep independent, correct prices, and that a price edit actually changes what's displayed.
+- **`v_sale_items` was never wired up in the demo mock at all** — `mockClient.js`'s table
+  dispatcher had no case for it, so every query against that view (used by `returns.html` to
+  find returnable lines, and now by `reports.html` for all profit figures) silently returned
+  an empty array. Returns therefore always showed "nothing on this receipt is returnable",
+  and no `sale_items` row ever carried `unit_cost_at_sale_cents`/
+  `cost_of_goods_sold_cents`/`gross_profit_cents` — those columns were simply never
+  populated on insert in the mock. Fixed by adding the missing case (mirroring the real
+  view, which is just `sale_items` with role-based column masking — masking itself isn't
+  replicated in demo mode, matching the mock's existing convention for the other masked
+  views) and adding `populateSaleItemCostSnapshot()`, which mirrors
+  `fn_populate_sale_item_cost_snapshot()`'s real logic exactly: look up whichever
+  `product_cost_history` row was in effect as of the *sale's own* `created_at`, not "now".
+  Verified with a Node test that sells a seeded variant, return checks `v_sale_items` come
+  back with correct COGS/profit, then processes a return against that same sale item and
+  confirms the stock and `v_sale_item_returns` both update correctly.
+- **`sw.js`'s app-shell cache list still referenced `transfers.html`/`js/transfers.js`**
+  after they were deleted. `cache.addAll()` is all-or-nothing — a single 404 aborts the
+  entire install step — so this would have made the service worker fail to install *at all*,
+  silently breaking offline support for the whole app, not just the deleted page. Fixed by
+  removing the stale entries and adding the batch's new pages (`reports.html`,
+  `activity.html`, and their scripts) to the shell list, with the cache version bumped so
+  existing installs pick up the corrected list.
 
 ## What's NOT built yet (still ahead, per the build prompt's step order)
 
@@ -190,18 +284,28 @@ with (Supabase Studio's Authentication tab, or `supabase auth` CLI, then insert 
   Entry" for its own quick product setup, but `purchase-orders.html` (step 5) now lets you
   type a real supplier name, which is found-or-created properly; there's just no page to
   browse/edit the supplier list itself yet.
-- Expenses entry, the profitability dashboard.
+- Expenses entry. (`reports.html` now covers total sales/profit, product performance, and a
+  Z-report — see step 10 above — but expense tracking itself, e.g. rent/utilities against
+  the `expenses` table the original schema already has, has no UI yet, so profit figures
+  are gross profit on goods sold, not net of overhead.)
+- A settings UI for `app_settings.manual_discount_cap_cents` (the manual-discount-before-PIN
+  threshold) — it exists and is enforced at checkout, but changing it today means a direct
+  DB/API update, not a form anywhere in the app.
+- Excel export (`reports.html`) dumps the core raw tables (Sales, Sale Items, Products,
+  Variants, Customers) for backup/analysis — it does not export the on-screen aggregated
+  report views (e.g. a pre-summed "monthly detail" sheet) as their own separate sheets; a
+  user wanting that recomputes it from the raw sheets or reads it off the report page itself.
 - Barcode *scanning* via camera — a USB/Bluetooth barcode scanner (the common
   types-then-Enter kind) works today against `pos.js`'s search box with no extra
   integration (see step 4 above). A camera-based scanner UI (using a phone's own camera to
   read a barcode, for a device with no separate scanner hardware) is not built.
 - Multi-currency **split** tender — `sale_payments` supports more than one payment row per
   sale, but the checkout UI only ever writes one. Full split-tender UI is a stretch goal.
-- Location picker on checkout — `pos.js` always sells at `profile.primary_location_id`.
-  Every non-owner role must have that field set (required by RLS) or checkout will fail
-  with a `location_id` not-null violation. The owner role is allowed by RLS to sell at
-  either location, but the UI doesn't yet expose a way to pick one — give the owner account
-  a `primary_location_id` too until a location switcher exists.
+- Location picker on checkout — moot for now since there's only one location left after the
+  steps 9–11 batch collapsed the two-location model into one (see the top-level README's
+  judgment-calls section); `pos.js` still always sells at `profile.primary_location_id`,
+  which every role (including owner) must have set for RLS to allow checkout at all. Would
+  become relevant again only if a second location were ever reintroduced.
 - Below-minimum wholesale quantity manager-approval gate — currently just blocks checkout
   with a message rather than routing to an approval flow.
 - An admin flow for creating `user_profiles` rows (assigning roles to new staff accounts).
@@ -220,10 +324,24 @@ Real logo files, not placeholders:
   dark surface for it to sit on yet; it's kept in case a dark-themed context (a dark mode
   toggle, a dark marketing page, etc.) comes up later.
 
-## Known limitation
+## Known limitations
 
-The service worker caches the app shell (HTML/CSS/JS) for offline loading, but it does
-**not** cache the Supabase CDN script or any API responses — those are intentionally left
-to the network. Offline behavior for *data* (checkout, sync) is handled entirely by the
-IndexedDB outbox, not by HTTP caching. First load of any page still requires being online
-once, to install the service worker and cache the shell.
+- The service worker caches the app shell (HTML/CSS/JS) for offline loading, but it does
+  **not** cache the Supabase CDN script or any API responses — those are intentionally left
+  to the network. Offline behavior for *data* (checkout, stock takes, returns, sync) is
+  handled entirely by the IndexedDB outbox, not by HTTP caching. First load of any page
+  still requires being online once, to install the service worker and cache the shell. (See
+  "Bugs found and fixed this pass" above — the shell list itself had gone stale after
+  `transfers.html` was deleted, which would have broken this entirely; that's fixed now.)
+- **Admin/product-variant writes, purchase orders, and customer creation remain
+  online-only by design** — only checkout, stock takes, and returns queue offline. These are
+  back-office actions a manager does at a desk, not shop-floor actions that must survive a
+  dead connection at the till; scoping the offline queue to the shop-floor paths keeps it
+  simple rather than generalizing it to every write in the app.
+- **Reports (`reports.html`) are online-only** — they need a complete, current view of sales
+  history to be meaningful, so there's no offline/cached fallback for this page, unlike the
+  shop-floor pages above.
+- **Presence is heartbeat-based, not real-time** — "online" means `last_seen_at` was updated
+  within the last 2 minutes (via a 60-second heartbeat from every open authenticated page),
+  not a live socket connection. A device that loses power or network ungracefully will still
+  show "online" for up to ~2 minutes after it actually went away.

@@ -13,28 +13,37 @@
 // only; sku/barcode/physical stock live on product_variants. Every product has at least
 // one variant, same as the real migration's zero-data-loss backfill guarantees.
 
-const STATE_KEY = 'subtle-pos-demo-state-v2';
+const STATE_KEY = 'subtle-pos-demo-state-v3';
 const SESSION_KEY = 'subtle-pos-demo-session-v1';
 
-export const DEMO_LOCATIONS = [
-  { id: 'loc-shop', name: 'Subtle Accessories Shop' },
-  { id: 'loc-wholesale', name: 'Home / Wholesale Store' },
-];
+// Single location -- wholesale inventory (a separate stock location) was removed per
+// explicit direction; wholesale PRICING (retail vs wholesale price tiers, min_wholesale_qty)
+// is unaffected, see the remove_wholesale_location migration's header comment.
+export const DEMO_LOCATIONS = [{ id: 'loc-shop', name: 'Subtle Accessories Shop' }];
 
 const MANUAL_SUPPLIER_ID = 'supplier-manual';
 
 // Any of these can sign in with any password. An email that doesn't match one of these
-// still signs in -- as the owner -- so a live demo never gets derailed by a typo.
+// still signs in -- as the owner -- so a live demo never gets derailed by a typo. Static
+// identity fields only (email/name/role) -- the actual queryable, mutable user_profiles
+// row (manager_pin, last_seen_at) lives in state.user_profiles, seeded from this list, so
+// those mutations persist across reloads the same way every other table's writes do.
 export const DEMO_ACCOUNTS = [
   { id: 'user-owner', email: 'owner@subtlepos.demo', full_name: 'Tendai Moyo', role: 'owner', primary_location_id: 'loc-shop' },
   { id: 'user-shop-manager', email: 'manager@subtlepos.demo', full_name: 'Rudo Chikwava', role: 'shop_manager', primary_location_id: 'loc-shop' },
-  { id: 'user-wholesale-manager', email: 'wholesale@subtlepos.demo', full_name: 'Farai Ncube', role: 'wholesale_manager', primary_location_id: 'loc-wholesale' },
+  { id: 'user-wholesale-manager', email: 'wholesale@subtlepos.demo', full_name: 'Farai Ncube', role: 'wholesale_manager', primary_location_id: 'loc-shop' },
   { id: 'user-cashier', email: 'cashier@subtlepos.demo', full_name: 'Tapiwa Dube', role: 'cashier', primary_location_id: 'loc-shop' },
 ];
 
-// Each product optionally lists variants (size/color/sku suffix/qty per location). A
+// Demo PINs so the manager-PIN discount-approval flow (step 9) is testable out of the box
+// without first visiting a settings screen. Real deployments start with manager_pin null.
+const DEMO_MANAGER_PINS = { 'user-owner': '1234', 'user-shop-manager': '5678' };
+
+// Each product optionally lists variants (size/color/sku suffix/qty/reorder threshold). A
 // product with no `variants` array gets exactly one default variant (size/color null),
-// same as the real migration's backfill of pre-existing flat-SKU products.
+// same as the real migration's backfill of pre-existing flat-SKU products. Quantities are
+// all single-location now (the former loc-shop + loc-wholesale split was merged into one
+// number per variant when the wholesale location was removed).
 const PRODUCT_SEED = [
   {
     sku: 'SA-001',
@@ -44,16 +53,16 @@ const PRODUCT_SEED = [
     wholesale: 1200,
     cost: 900,
     variants: [
-      { size: null, color: 'Brown', skuSuffix: 'BRN', qty: { 'loc-shop': 22, 'loc-wholesale': 60 } },
-      { size: null, color: 'Black', skuSuffix: 'BLK', qty: { 'loc-shop': 20, 'loc-wholesale': 60 } },
+      { size: null, color: 'Brown', skuSuffix: 'BRN', qty: 82 },
+      { size: null, color: 'Black', skuSuffix: 'BLK', qty: 80 },
     ],
   },
-  { sku: 'SA-002', name: 'Aviator Sunglasses', description: 'UV400 mirrored lenses.', retail: 2200, wholesale: 1500, cost: 1100, qty: { 'loc-shop': 28, 'loc-wholesale': 90 } },
-  { sku: 'SA-003', name: 'Beaded Bracelet', description: 'Handmade glass-bead bracelet.', retail: 800, wholesale: 500, cost: 350, qty: { 'loc-shop': 65, 'loc-wholesale': 200 } },
-  { sku: 'SA-004', name: 'Phone Case — iPhone 14', description: 'Shock-absorbing silicone case.', retail: 1500, wholesale: 950, cost: 700, qty: { 'loc-shop': 37, 'loc-wholesale': 110 } },
-  { sku: 'SA-005', name: 'Canvas Tote Bag', description: 'Heavyweight cotton canvas tote.', retail: 2500, wholesale: 1700, cost: 1250, qty: { 'loc-shop': 20, 'loc-wholesale': 65 } },
-  { sku: 'SA-006', name: 'Stainless Steel Watch', description: 'Quartz movement, sapphire coating.', retail: 4500, wholesale: 3200, cost: 2400, qty: { 'loc-shop': 15, 'loc-wholesale': 40 } },
-  { sku: 'SA-007', name: 'Hoop Earrings', description: 'Gold-plated stainless steel hoops.', retail: 1000, wholesale: 650, cost: 450, qty: { 'loc-shop': 50, 'loc-wholesale': 150 } },
+  { sku: 'SA-002', name: 'Aviator Sunglasses', description: 'UV400 mirrored lenses.', retail: 2200, wholesale: 1500, cost: 1100, qty: 118 },
+  { sku: 'SA-003', name: 'Beaded Bracelet', description: 'Handmade glass-bead bracelet.', retail: 800, wholesale: 500, cost: 350, qty: 265 },
+  { sku: 'SA-004', name: 'Phone Case — iPhone 14', description: 'Shock-absorbing silicone case.', retail: 1500, wholesale: 950, cost: 700, qty: 147 },
+  { sku: 'SA-005', name: 'Canvas Tote Bag', description: 'Heavyweight cotton canvas tote.', retail: 2500, wholesale: 1700, cost: 1250, qty: 85 },
+  { sku: 'SA-006', name: 'Stainless Steel Watch', description: 'Quartz movement, sapphire coating.', retail: 4500, wholesale: 3200, cost: 2400, qty: 55, reorderThreshold: 10 },
+  { sku: 'SA-007', name: 'Hoop Earrings', description: 'Gold-plated stainless steel hoops.', retail: 1000, wholesale: 650, cost: 450, qty: 200 },
   {
     sku: 'SA-008',
     name: 'Leather Belt',
@@ -62,12 +71,12 @@ const PRODUCT_SEED = [
     wholesale: 1050,
     cost: 800,
     variants: [
-      { size: 'S', color: null, skuSuffix: 'S', qty: { 'loc-shop': 12, 'loc-wholesale': 30 } },
-      { size: 'M', color: null, skuSuffix: 'M', qty: { 'loc-shop': 14, 'loc-wholesale': 35 } },
-      { size: 'L', color: null, skuSuffix: 'L', qty: { 'loc-shop': 10, 'loc-wholesale': 30 } },
+      { size: 'S', color: null, skuSuffix: 'S', qty: 42 },
+      { size: 'M', color: null, skuSuffix: 'M', qty: 49 },
+      { size: 'L', color: null, skuSuffix: 'L', qty: 8, reorderThreshold: 10 }, // seeded already below threshold, so the low-stock badge has something to show out of the box
     ],
   },
-  { sku: 'SA-009', name: 'Baseball Cap', description: 'Adjustable cotton twill cap.', retail: 1200, wholesale: 800, cost: 550, qty: { 'loc-shop': 44, 'loc-wholesale': 130 } },
+  { sku: 'SA-009', name: 'Baseball Cap', description: 'Adjustable cotton twill cap.', retail: 1200, wholesale: 800, cost: 550, qty: 174 },
   {
     sku: 'SA-010',
     name: 'Silk Scarf',
@@ -76,8 +85,8 @@ const PRODUCT_SEED = [
     wholesale: 1300,
     cost: 950,
     variants: [
-      { size: null, color: 'Red', skuSuffix: 'RED', qty: { 'loc-shop': 9, 'loc-wholesale': 28 } },
-      { size: null, color: 'Blue', skuSuffix: 'BLU', qty: { 'loc-shop': 9, 'loc-wholesale': 27 } },
+      { size: null, color: 'Red', skuSuffix: 'RED', qty: 37, reorderThreshold: 15 },
+      { size: null, color: 'Blue', skuSuffix: 'BLU', qty: 36, reorderThreshold: 15 },
     ],
   },
 ];
@@ -113,7 +122,7 @@ function buildSeed() {
       stock_receipt_id: null,
     });
 
-    const variantDefs = p.variants ?? [{ size: null, color: null, skuSuffix: null, qty: p.qty }];
+    const variantDefs = p.variants ?? [{ size: null, color: null, skuSuffix: null, qty: p.qty, reorderThreshold: p.reorderThreshold }];
     variantDefs.forEach((v, vi) => {
       const variantId = `var-${productId}-${vi + 1}`;
       const sku = v.skuSuffix ? `${p.sku}-${v.skuSuffix}` : p.sku;
@@ -125,20 +134,19 @@ function buildSeed() {
         sku,
         barcode: null,
         is_active: true,
+        reorder_threshold: v.reorderThreshold ?? null,
       });
-      for (const locId of Object.keys(v.qty ?? {})) {
-        balances.push({
-          id: `bal-${variantId}-${locId}`,
-          variant_id: variantId,
-          location_id: locId,
-          quantity_available: v.qty[locId],
-          average_unit_cost_cents: p.cost,
-          currency: 'USD',
-          needs_review: false,
-          needs_review_reason: null,
-          updated_at: new Date().toISOString(),
-        });
-      }
+      balances.push({
+        id: `bal-${variantId}-loc-shop`,
+        variant_id: variantId,
+        location_id: 'loc-shop',
+        quantity_available: v.qty ?? 0,
+        average_unit_cost_cents: p.cost,
+        currency: 'USD',
+        needs_review: false,
+        needs_review_reason: null,
+        updated_at: new Date().toISOString(),
+      });
     });
   });
 
@@ -160,6 +168,23 @@ function buildSeed() {
     purchase_orders: [],
     purchase_order_items: [],
     inventory_transfers: [],
+    user_profiles: DEMO_ACCOUNTS.map((a) => ({ ...a, manager_pin: DEMO_MANAGER_PINS[a.id] ?? null, last_seen_at: null })),
+    app_settings: [{ key: 'manual_discount_cap_cents', value: 2000, updated_at: new Date().toISOString() }],
+    discount_codes: [
+      {
+        id: 'discount-seed-1',
+        code: 'WELCOME10',
+        discount_type: 'percentage',
+        discount_value: 10,
+        min_spend_cents: 0,
+        valid_from: '2026-01-01T00:00:00.000Z',
+        valid_until: null,
+        is_active: true,
+        created_by: 'user-owner',
+        created_at: '2026-01-01T00:00:00.000Z',
+      },
+    ],
+    activity_log: [],
     inventory_transfer_items: [],
     customers: [],
     imageStore: {},
@@ -240,10 +265,17 @@ function tableRows(table) {
     case 'locations':
       return DEMO_LOCATIONS;
     case 'user_profiles':
-      return DEMO_ACCOUNTS;
+      return state.user_profiles;
+    case 'app_settings':
+      return state.app_settings;
+    case 'discount_codes':
+      return state.discount_codes;
+    case 'activity_log':
+      return state.activity_log;
     case 'sales':
       return state.sales;
     case 'sale_items':
+    case 'v_sale_items':
       return state.sale_items;
     case 'sale_payments':
       return state.sale_payments;
@@ -284,13 +316,33 @@ function findOrCreateBalance(variantId, locationId, currency) {
   return balance;
 }
 
+// Mirrors fn_populate_sale_item_cost_snapshot: looks up whatever product_cost_history row
+// was in effect as of the parent sale's own created_at (not "now"), and freezes it onto the
+// row -- exactly what the real BEFORE INSERT trigger does server-side, since a cashier's
+// device can never be trusted (or, under RLS, even able) to know or send its own cost basis.
+function populateSaleItemCostSnapshot(row, saleCreatedAt) {
+  const variant = state.variants.find((v) => v.id === row.variant_id);
+  if (!variant) throw new Error(`Unknown variant ${row.variant_id} for sale item`);
+  const candidates = state.cost_history
+    .filter((c) => c.product_id === variant.product_id && c.effective_date <= saleCreatedAt)
+    .sort((a, b) => (a.effective_date < b.effective_date ? 1 : -1));
+  const cost = candidates[0];
+  if (!cost) {
+    throw new Error(
+      `No product_cost_history exists for product ${variant.product_id} (variant ${row.variant_id}) as of ${saleCreatedAt}; cannot record a sale with no cost basis to snapshot.`
+    );
+  }
+  row.unit_cost_at_sale_cents = cost.unit_cost_cents;
+  row.cost_of_goods_sold_cents = row.quantity * cost.unit_cost_cents;
+  row.gross_profit_cents = row.quantity * row.unit_selling_price_cents - row.cost_of_goods_sold_cents;
+}
+
 // Mirrors fn_apply_sale_item_inventory_impact: decrement the selling location's stock the
 // moment a sale_items row is written, so Inventory reflects a demo sale immediately.
-// NOTE: sale_items now key on variant_id -- pos.js has not been reworked to send that yet
-// (that's a later step), so this path is currently unreachable from the UI until it is.
 function applySaleItemStockImpact(row) {
   const sale = state.sales.find((s) => s.id === row.sale_id);
   if (!sale) return;
+  populateSaleItemCostSnapshot(row, sale.created_at);
   const balance = findOrCreateBalance(row.variant_id, sale.location_id, row.currency);
   balance.quantity_available -= row.quantity;
   balance.updated_at = new Date().toISOString();
@@ -412,6 +464,15 @@ function applyWrite(table, rows) {
   const target = tableRows(table);
   try {
     for (const row of rows) {
+      // app_settings is keyed by `key`, not `id`, and needs real upsert-replace semantics
+      // (the whole point is that the discount cap can be changed), not the
+      // insert-once/ignore-duplicates behavior every other table here uses.
+      if (table === 'app_settings') {
+        const existing = target.find((r) => r.key === row.key);
+        if (existing) Object.assign(existing, row);
+        else target.push(row);
+        continue;
+      }
       if (target.find((r) => r.id === row.id)) continue; // upsert + ignoreDuplicates semantics
       if (table === 'sale_item_returns') processSaleItemReturn(row); // may throw; mutates row
       target.push(row);
@@ -568,5 +629,19 @@ export function createMockClient() {
       return new MockQuery(table);
     },
     storage: createMockStorage(),
+    // Mirrors verify_manager_pin(): returns the matching manager/owner's id, or null --
+    // never the PIN itself or which OTHER pins exist, matching the real RPC's contract.
+    async rpc(fnName, params = {}) {
+      if (fnName === 'verify_manager_pin') {
+        const pin = params.p_pin;
+        const match = pin
+          ? state.user_profiles.find(
+              (u) => u.manager_pin === pin && ['shop_manager', 'wholesale_manager', 'owner'].includes(u.role)
+            )
+          : null;
+        return { data: match ? match.id : null, error: null };
+      }
+      return { data: null, error: { message: `Unknown RPC function in demo mode: ${fnName}` } };
+    },
   };
 }

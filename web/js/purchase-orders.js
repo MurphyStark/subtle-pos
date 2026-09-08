@@ -3,6 +3,7 @@ import { getClient } from './supabaseClient.js';
 import { formatCents, toCents } from './money.js';
 import { renderNav } from './nav.js';
 import { registerServiceWorker } from './pwa.js';
+import { logActivity } from './activity.js';
 
 // STEP 5 of the fashion-retail evolution. Manager/owner only (RLS: purchase_orders_all /
 // purchase_order_items_all require is_manager_or_owner()).
@@ -51,6 +52,14 @@ async function init() {
 
   const variantSelect = document.getElementById('po-line-variant');
   variantSelect.innerHTML = variantOptions.map((v) => `<option value="${v.id}">${v.label}</option>`).join('');
+
+  // STEP 11: a low-stock link from inventory.html arrives as ?variant=<id> -- pre-select it
+  // so a manager reordering from that alert doesn't have to hunt for it in a long dropdown.
+  const preselectVariantId = new URLSearchParams(window.location.search).get('variant');
+  if (preselectVariantId && variantOptions.some((v) => v.id === preselectVariantId)) {
+    variantSelect.value = preselectVariantId;
+    document.getElementById('po-line-qty').focus();
+  }
 
   document.getElementById('po-line-add').addEventListener('click', addDraftLine);
   document.getElementById('po-form').addEventListener('submit', handleCreatePo);
@@ -148,6 +157,8 @@ async function handleCreatePo(event) {
       }))
     );
 
+    await logActivity(profile, 'purchase_order_created', `${profile.full_name} created a purchase order (${draftLines.length} line${draftLines.length === 1 ? '' : 's'})`, { purchase_order_id: poId });
+
     successEl.textContent = 'Purchase order created.';
     draftLines = [];
     renderDraftLines();
@@ -208,6 +219,14 @@ async function handleReceive(po, lines) {
     .from('purchase_orders')
     .update({ status: allReceived ? 'received' : anyReceived ? 'partially_received' : po.status })
     .eq('id', po.id);
+
+  const totalReceived = toReceive.reduce((sum, r) => sum + r.qty, 0);
+  await logActivity(
+    profile,
+    'stock_change',
+    `${profile.full_name} received ${totalReceived} unit${totalReceived === 1 ? '' : 's'} against a purchase order`,
+    { purchase_order_id: po.id, quantity_received: totalReceived }
+  );
 
   await renderPoList();
 }

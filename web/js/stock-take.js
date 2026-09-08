@@ -2,6 +2,9 @@ import { requireAuth } from './auth.js';
 import { getClient } from './supabaseClient.js';
 import { renderNav } from './nav.js';
 import { registerServiceWorker } from './pwa.js';
+import { queueOutbox, countPendingOutbox } from './db.js';
+import { initSyncListeners, replayOutbox } from './sync.js';
+import { logActivity } from './activity.js';
 
 // Any role can run a stock take at their OWN location (RLS: stock_counts_insert lets a
 // cashier insert at their primary_location_id); only managers/owner can pick a different
@@ -10,6 +13,11 @@ import { registerServiceWorker } from './pwa.js';
 //
 // Stock is tracked per VARIANT (size/color/SKU), not per product -- see the
 // product_variants migration -- so a stock take counts variants, not products.
+//
+// Offline-capable, same pattern as checkout: if the write fails (or the device is already
+// offline), the whole completed count queues in IndexedDB and replays once connectivity
+// returns (see js/sync.js's pushStockCount) -- a stock take on the shop floor shouldn't be
+// blocked by a dead connection any more than a sale should.
 let profile = null;
 let locations = [];
 let currentLocationId = null;
@@ -39,6 +47,11 @@ async function init() {
   });
 
   document.getElementById('complete-btn').addEventListener('click', completeStockTake);
+
+  initSyncListeners(refreshStatusBanner);
+  window.addEventListener('online', refreshStatusBanner);
+  window.addEventListener('offline', refreshStatusBanner);
+  await refreshStatusBanner();
 
   await loadCounts();
 }
@@ -112,46 +125,82 @@ async function completeStockTake() {
   const completeBtn = document.getElementById('complete-btn');
   completeBtn.disabled = true;
 
+  const countId = crypto.randomUUID();
+  const nowIso = new Date().toISOString();
+  const container = document.getElementById('stock-take-body');
+  const items = rows.map((r) => {
+    const input = container.querySelector(`.stock-take-row[data-id="${r.variant.id}"] .counted-input`);
+    return {
+      id: crypto.randomUUID(),
+      stock_count_id: countId,
+      variant_id: r.variant.id,
+      counted_quantity: Number(input.value || 0),
+      system_quantity_at_count: r.systemQty,
+    };
+  });
+  const stockCount = {
+    id: countId,
+    location_id: currentLocationId,
+    status: 'draft',
+    counted_by: profile.id,
+    sync_status: 'synced',
+    created_at: nowIso,
+    completed_at: nowIso,
+  };
+
   try {
-    const client = getClient();
-    const countId = crypto.randomUUID();
-    const nowIso = new Date().toISOString();
-
-    await client.from('stock_counts').insert({
-      id: countId,
-      location_id: currentLocationId,
-      status: 'draft',
-      counted_by: profile.id,
-      sync_status: 'synced',
-      created_at: nowIso,
-    });
-
-    const container = document.getElementById('stock-take-body');
-    const items = rows.map((r) => {
-      const input = container.querySelector(`.stock-take-row[data-id="${r.variant.id}"] .counted-input`);
-      return {
-        id: crypto.randomUUID(),
-        stock_count_id: countId,
-        variant_id: r.variant.id,
-        counted_quantity: Number(input.value || 0),
-        system_quantity_at_count: r.systemQty,
-      };
-    });
-    await client.from('stock_count_items').insert(items);
-
-    // Transitioning draft -> completed is what triggers the reconciliation (server-side
-    // trigger in the real schema, mirrored in mockClient.js for demo mode) that sets
-    // inventory_balances.quantity_available to exactly what was counted.
-    await client.from('stock_counts').update({ status: 'completed', completed_at: nowIso }).eq('id', countId);
-
-    const changed = items.filter((i) => i.counted_quantity !== i.system_quantity_at_count).length;
-    banner.innerHTML = `<div class="status-banner ok">Stock take completed — ${changed} variant${changed === 1 ? '' : 's'} adjusted.</div>`;
-
-    await loadCounts();
+    if (navigator.onLine) {
+      const client = getClient();
+      const { error: countError } = await client.from('stock_counts').insert(stockCount);
+      if (countError) throw countError;
+      const { error: itemsError } = await client.from('stock_count_items').insert(items);
+      if (itemsError) throw itemsError;
+      // Transitioning draft -> completed is what triggers the reconciliation (server-side
+      // trigger in the real schema, mirrored in mockClient.js for demo mode) that sets
+      // inventory_balances.quantity_available to exactly what was counted.
+      const { error: statusError } = await client
+        .from('stock_counts')
+        .update({ status: 'completed', completed_at: nowIso })
+        .eq('id', countId);
+      if (statusError) throw statusError;
+    } else {
+      throw new Error('offline'); // fall through to the offline queue below
+    }
   } catch (err) {
-    errorEl.textContent = err.message ?? String(err);
-  } finally {
-    completeBtn.disabled = false;
+    await queueOutbox({
+      id: countId,
+      entity_type: 'stock_count',
+      entity_id: countId,
+      status: 'pending',
+      created_at: nowIso,
+      payload: { stockCount, items },
+    });
+  }
+
+  const changed = items.filter((i) => i.counted_quantity !== i.system_quantity_at_count).length;
+  banner.innerHTML = `<div class="status-banner ok">Stock take completed — ${changed} variant${changed === 1 ? '' : 's'} adjusted.</div>`;
+
+  await logActivity(
+    profile,
+    'stock_change',
+    `${profile.full_name} completed a stock take (${changed} variant${changed === 1 ? '' : 's'} adjusted)`,
+    { stock_count_id: countId, location_id: currentLocationId, changed_count: changed }
+  );
+
+  await loadCounts();
+  await refreshStatusBanner();
+  replayOutbox(refreshStatusBanner);
+  completeBtn.disabled = false;
+}
+
+async function refreshStatusBanner() {
+  const pending = await countPendingOutbox();
+  if (pending === 0) return; // don't stomp the "stock take completed" message with an empty banner
+  const banner = document.getElementById('status-banner');
+  if (!navigator.onLine) {
+    banner.innerHTML = `<div class="status-banner offline">Offline — ${pending} stock take${pending === 1 ? '' : 's'} queued and will sync once you're back online.</div>`;
+  } else {
+    banner.innerHTML = `<div class="status-banner pending">Syncing ${pending} queued stock take${pending === 1 ? '' : 's'}…</div>`;
   }
 }
 

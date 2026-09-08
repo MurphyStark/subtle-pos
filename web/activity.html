@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Subtle POS — Activity</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="icons/favicon.png" />
+  <link rel="apple-touch-icon" href="icons/favicon.png" />
+  <meta name="theme-color" content="#17563b" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <nav id="app-nav"></nav>
+
+  <main>
+    <h1>Who's online</h1>
+    <div class="card">
+      <div id="presence-list"></div>
+    </div>
+
+    <h1 style="margin-top: 1.5rem;">Activity log</h1>
+    <div class="card">
+      <div class="form-grid">
+        <label>User
+          <select id="filter-user"><option value="">All staff</option></select>
+        </label>
+        <label>Action
+          <select id="filter-action"><option value="">All actions</option></select>
+        </label>
+        <label>From <input type="date" id="filter-from" /></label>
+        <label>To <input type="date" id="filter-to" /></label>
+      </div>
+      <div id="activity-table" style="margin-top: 0.75rem;"></div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="js/activity-page.js"></script>
+</body>
+</html>

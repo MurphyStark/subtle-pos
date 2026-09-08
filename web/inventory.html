@@ -17,6 +17,10 @@
     <h1>Inventory balances</h1>
     <p class="error" id="inventory-error"></p>
     <div class="card">
+      <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
+        <input type="checkbox" id="low-stock-toggle" /> Show low-stock only
+      </label>
+      <p id="low-stock-summary" style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.4rem;"></p>
       <table>
         <thead>
           <tr>
@@ -27,10 +31,11 @@
             <th>Qty available</th>
             <th>Avg. unit cost</th>
             <th></th>
+            <th></th>
           </tr>
         </thead>
         <tbody id="inventory-body">
-          <tr><td colspan="7">Loading…</td></tr>
+          <tr><td colspan="8">Loading…</td></tr>
         </tbody>
       </table>
     </div>

@@ -3,6 +3,7 @@ import { getClient } from './supabaseClient.js';
 import { formatCents } from './money.js';
 import { renderNav } from './nav.js';
 import { registerServiceWorker } from './pwa.js';
+import { logActivity } from './activity.js';
 
 // STEP 8 of the fashion-retail evolution. Not sensitive financial data -- any authenticated
 // role can view or add a customer (RLS: customers_select / customers_write both
@@ -51,7 +52,9 @@ async function handleAddCustomer(event) {
       }
     }
 
-    await client.from('customers').insert({ id: crypto.randomUUID(), name, phone, email });
+    const customerId = crypto.randomUUID();
+    await client.from('customers').insert({ id: customerId, name, phone, email });
+    await logActivity(profile, 'customer_created', `${profile.full_name} added customer ${name}`, { customer_id: customerId });
     form.reset();
     await loadCustomers();
   } catch (err) {

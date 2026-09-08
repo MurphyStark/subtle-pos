@@ -11,7 +11,7 @@ export async function getCurrentProfile() {
 
   const { data: profile, error } = await client
     .from('user_profiles')
-    .select('id, full_name, role, primary_location_id')
+    .select('id, full_name, role, primary_location_id, manager_pin, last_seen_at')
     .eq('id', session.user.id)
     .single();
 
@@ -41,7 +41,14 @@ export async function requireAuth(allowedRoles = null) {
   return result;
 }
 
-export async function signOut() {
+// profile is optional but should be passed whenever the caller already has it -- logging
+// "logout" needs to happen BEFORE the session actually ends (activity_log's RLS requires
+// user_id = auth.uid(), which stops being true the instant signOut() completes).
+export async function signOut(profile) {
+  if (profile) {
+    const { logActivity } = await import('./activity.js');
+    await logActivity(profile, 'logout', `${profile.full_name} logged out`);
+  }
   await getClient().auth.signOut();
   window.location.href = 'index.html';
 }

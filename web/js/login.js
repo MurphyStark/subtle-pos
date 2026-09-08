@@ -2,6 +2,7 @@ import { getClient, isDemoMode } from './supabaseClient.js';
 import { getCurrentProfile } from './auth.js';
 import { registerServiceWorker } from './pwa.js';
 import { DEMO_ACCOUNTS, resetDemoData } from './mockClient.js';
+import { logActivity } from './activity.js';
 
 async function init() {
   registerServiceWorker();
@@ -40,13 +41,23 @@ async function signIn(email, password) {
   const submitBtn = document.querySelector('#login-form button[type="submit"]');
   submitBtn.disabled = true;
 
-  const { error } = await getClient().auth.signInWithPassword({ email, password });
+  const client = getClient();
+  const { error } = await client.auth.signInWithPassword({ email, password });
 
   submitBtn.disabled = false;
   if (error) {
     errorEl.textContent = error.message;
     return;
   }
+
+  const { data: session } = await client.auth.getSession();
+  const { data: profile } = await client
+    .from('user_profiles')
+    .select('id, full_name')
+    .eq('id', session.session.user.id)
+    .single();
+  if (profile) await logActivity(profile, 'login', `${profile.full_name} logged in`);
+
   window.location.href = 'pos.html';
 }
 

@@ -46,6 +46,44 @@
 
     <h1 style="margin-top: 1.5rem;">Products &amp; variants</h1>
     <div id="product-list"></div>
+
+    <h1 style="margin-top: 1.5rem;">Discount codes</h1>
+    <div class="card">
+      <form id="discount-code-form" class="admin-form">
+        <div class="form-grid">
+          <label>Code <input type="text" name="code" required placeholder="e.g. SUMMER20" style="text-transform: uppercase;" /></label>
+          <label>Type
+            <select name="discount_type">
+              <option value="percentage">Percentage</option>
+              <option value="fixed">Fixed amount</option>
+            </select>
+          </label>
+          <label>Value <input type="number" name="discount_value" min="0.01" step="0.01" required placeholder="10 = 10% or $10.00" /></label>
+          <label>Min. spend <input type="number" name="min_spend" min="0" step="0.01" placeholder="0" /></label>
+          <label>Valid until <input type="date" name="valid_until" /></label>
+        </div>
+        <button type="submit" class="primary">Add discount code</button>
+        <p class="error" id="discount-code-error"></p>
+      </form>
+      <table style="margin-top: 1rem;">
+        <thead><tr><th>Code</th><th>Type</th><th>Value</th><th>Min. spend</th><th>Valid until</th><th>Active</th><th></th></tr></thead>
+        <tbody id="discount-code-list-body"><tr><td colspan="7">Loading…</td></tr></tbody>
+      </table>
+    </div>
+
+    <h1 style="margin-top: 1.5rem;">My manager PIN</h1>
+    <p style="color: var(--text-muted); margin-top: -0.5rem;">
+      A short PIN a cashier can ask you to enter at checkout to approve a manual discount
+      above the store's cap — quicker than logging you in on their device.
+    </p>
+    <div class="card">
+      <form id="pin-form" class="admin-form" style="max-width: 280px;">
+        <label>New PIN (4–6 digits) <input type="text" name="pin" inputmode="numeric" pattern="[0-9]{4,6}" placeholder="e.g. 4821" /></label>
+        <button type="submit" class="primary">Save PIN</button>
+        <p class="error" id="pin-error"></p>
+        <p id="pin-success" style="color: var(--brand-dark); font-size: 0.9rem;"></p>
+      </form>
+    </div>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
