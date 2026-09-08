@@ -29,7 +29,7 @@ export function showReceipt({ sale, lines, locationName, cashierName }) {
         .map(
           (l) => `
         <div class="receipt-line">
-          <span class="receipt-item-name">${l.quantity} × ${l.name}</span>
+          <span class="receipt-item-name">${l.quantity} × ${l.name}${l.variantLabel ? ` (${l.variantLabel})` : ''}</span>
           <span>${formatCents(l.quantity * l.unitPriceCents, sale.currency)}</span>
         </div>`
         )

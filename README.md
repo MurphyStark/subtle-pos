@@ -95,7 +95,7 @@ No Supabase project exists yet for Subtle POS. To stand this up:
 The project is now also mid-way through an 11-step fashion-retail evolution (size/color
 variants, purchase orders, returns, promotions, reporting, low-stock alerts) reviewed one
 step at a time — see `web/README.md`'s "Fashion-retail evolution" section for exact status.
-Steps 1 (data model), 2 (admin: product + variant creation), and 3 (barcode labels, no
-migration needed — pure rendering over existing data) are done; **checkout
-(`web/pos.html`) is currently broken** as a deliberate consequence of step 1 — reworking it
-for a size/color picker is step 4, scoped separately so it can be reviewed on its own.
+Steps 1 (data model), 2 (admin: product + variant creation), 3 (barcode labels), and 4
+(checkout: variant picker + exact-barcode-scan resolution) are all done — `web/pos.html` is
+fully working again. Still ahead: purchase orders/transfers, returns, customers,
+promotions, reporting, and low-stock alerts (steps 5–11).

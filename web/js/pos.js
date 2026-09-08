@@ -1,7 +1,7 @@
 import { requireAuth } from './auth.js';
 import { getClient } from './supabaseClient.js';
 import { formatCents, toCents } from './money.js';
-import { cacheProducts, getCachedProducts, queueOutbox, countPendingOutbox } from './db.js';
+import { cacheProducts, getCachedProducts, cacheVariants, getCachedVariants, queueOutbox, countPendingOutbox } from './db.js';
 import { initSyncListeners, replayOutbox } from './sync.js';
 import { renderNav } from './nav.js';
 import { registerServiceWorker } from './pwa.js';
@@ -10,18 +10,20 @@ import { showReceipt } from './receipt.js';
 // MVP simplification, flagged in the README: one currency and one payment method per sale.
 // Split/multi-currency tender (sale_payments supports it) is a stretch goal, not built yet.
 //
-// KNOWN BROKEN as of the product_variants migration (step 1 of the fashion-retail plan):
-// this file still queries products.sku/product_prices/sale_items by product_id, all of
-// which now live one level down on product_variants (see that migration's header comment
-// and web/README.md). Reworking checkout for a size/color picker is its own deliberately
-// separate step (step 4) so it can be reviewed on its own -- until then this page will not
-// load products correctly against either the real schema or the updated mockClient.js.
+// STEP 4 of the fashion-retail evolution: reworked for product_variants. Price/cost stay
+// at the product level (see that migration's header comment); identity, barcode, and
+// stock all live on the variant. A product with exactly one variant skips the picker (the
+// common case for a product with no real size/color variation); a product with more than
+// one opens a picker. A search term that exactly matches a variant's barcode or SKU on
+// Enter resolves straight to that variant and adds it, mirroring how a USB/Bluetooth
+// barcode scanner behaves (types the code, then sends an Enter keystroke).
 
 let profile = null;
-let products = [];
-let cart = []; // [{ product, quantity }]
+let products = []; // [{ ...product fields, retail_price_cents, wholesale_price_cents, currency, variants: [...] }]
+let cart = []; // [{ product, variant, quantity }]
 let saleType = 'retail';
 let locationName = '';
+let balancesByVariant = {}; // variant_id -> quantity_available at the CURRENT location, display-only
 
 async function init() {
   registerServiceWorker();
@@ -42,15 +44,43 @@ async function init() {
   await refreshStatusBanner();
 }
 
+function buildSellableProducts(rawProducts, rawVariants) {
+  const variantsByProduct = {};
+  for (const v of rawVariants) {
+    if (v.is_active === false) continue;
+    (variantsByProduct[v.product_id] ??= []).push(v);
+  }
+  // A product with no variants isn't sellable yet -- see admin.html's own messaging.
+  products = rawProducts.map((p) => ({ ...p, variants: variantsByProduct[p.id] ?? [] })).filter((p) => p.variants.length > 0);
+}
+
+async function loadBalances(client) {
+  try {
+    const { data } = await client
+      .from('v_inventory_balances')
+      .select('variant_id, location_id, quantity_available')
+      .eq('location_id', profile.primary_location_id);
+    balancesByVariant = Object.fromEntries((data ?? []).map((b) => [b.variant_id, b.quantity_available]));
+  } catch {
+    balancesByVariant = {}; // display-only -- checkout still works without stock counts shown
+  }
+}
+
 async function loadProducts() {
   if (navigator.onLine) {
     try {
       const client = getClient();
       const { data: prods, error: prodError } = await client
         .from('products')
-        .select('id, sku, barcode, name, base_currency, min_wholesale_qty, is_active')
+        .select('id, name, base_currency, min_wholesale_qty, is_active')
         .eq('is_active', true);
       if (prodError) throw prodError;
+
+      const { data: variantRows, error: variantError } = await client
+        .from('product_variants')
+        .select('id, product_id, size, color, sku, barcode, is_active')
+        .eq('is_active', true);
+      if (variantError) throw variantError;
 
       const { data: prices, error: priceError } = await client
         .from('product_prices')
@@ -64,19 +94,27 @@ async function loadProducts() {
         if (!latest[key]) latest[key] = p; // already sorted newest-first
       }
 
-      products = prods.map((p) => ({
+      // Price baked directly onto the cached product row, same pattern this file used
+      // before variants existed -- the offline fallback just reads these back as-is.
+      const enrichedProducts = prods.map((p) => ({
         ...p,
         retail_price_cents: latest[`${p.id}:retail`]?.unit_price_cents ?? null,
         wholesale_price_cents: latest[`${p.id}:wholesale`]?.unit_price_cents ?? null,
         currency: latest[`${p.id}:retail`]?.currency ?? p.base_currency,
       }));
-      await cacheProducts(products);
+
+      await cacheProducts(enrichedProducts);
+      await cacheVariants(variantRows);
+      await loadBalances(client);
+
+      buildSellableProducts(enrichedProducts, variantRows);
       return;
     } catch (err) {
       console.warn('Could not fetch products online, falling back to cache:', err);
     }
   }
-  products = await getCachedProducts();
+  const [cachedProducts, cachedVariants] = await Promise.all([getCachedProducts(), getCachedVariants()]);
+  buildSellableProducts(cachedProducts, cachedVariants);
 }
 
 async function loadLocationName() {
@@ -93,17 +131,18 @@ function currentPriceCents(product) {
   return saleType === 'wholesale' ? product.wholesale_price_cents : product.retail_price_cents;
 }
 
+function variantLabel(variant) {
+  return [variant.size, variant.color].filter(Boolean).join(' / ');
+}
+
 function renderProductGrid(filter = '') {
   const grid = document.getElementById('product-grid');
   const term = filter.trim().toLowerCase();
   const visible = products.filter((p) => {
     if (currentPriceCents(p) == null) return false; // no price set for this sale type
     if (!term) return true;
-    return (
-      p.name.toLowerCase().includes(term) ||
-      p.sku.toLowerCase().includes(term) ||
-      (p.barcode ?? '').toLowerCase() === term
-    );
+    if (p.name.toLowerCase().includes(term)) return true;
+    return p.variants.some((v) => (v.sku ?? '').toLowerCase().includes(term) || (v.barcode ?? '').toLowerCase() === term);
   });
 
   grid.innerHTML = visible
@@ -112,33 +151,96 @@ function renderProductGrid(filter = '') {
       <button type="button" class="product-tile" data-id="${p.id}">
         <span class="name">${p.name}</span>
         <span class="price">${formatCents(currentPriceCents(p), p.currency)}</span>
+        ${p.variants.length > 1 ? `<span class="variant-count">${p.variants.length} options</span>` : ''}
       </button>`
     )
     .join('');
 
   grid.querySelectorAll('.product-tile').forEach((tile) => {
-    tile.addEventListener('click', () => addToCart(tile.dataset.id));
+    tile.addEventListener('click', () => {
+      const product = products.find((p) => p.id === tile.dataset.id);
+      if (!product) return;
+      if (product.variants.length === 1) {
+        addVariantToCart(product, product.variants[0]);
+      } else {
+        showVariantPicker(product);
+      }
+    });
   });
 }
 
-function addToCart(productId) {
-  const product = products.find((p) => p.id === productId);
-  if (!product) return;
+function showVariantPicker(product) {
+  const existing = document.getElementById('variant-picker-overlay');
+  if (existing) existing.remove();
 
-  const existing = cart.find((line) => line.product.id === productId);
+  const overlay = document.createElement('div');
+  overlay.id = 'variant-picker-overlay';
+  overlay.className = 'variant-picker-overlay';
+  overlay.innerHTML = `
+    <div class="variant-picker-card">
+      <h2>${product.name}</h2>
+      <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: -0.5rem;">Choose an option</p>
+      <div class="variant-picker-options">
+        ${product.variants
+          .map((v) => {
+            const label = variantLabel(v) || v.sku;
+            const qty = balancesByVariant[v.id];
+            return `<button type="button" class="variant-option-btn" data-variant-id="${v.id}">
+              <span>${label}</span>
+              ${qty != null ? `<span class="variant-qty">${qty} in stock</span>` : ''}
+            </button>`;
+          })
+          .join('')}
+      </div>
+      <button type="button" class="ghost" id="variant-picker-cancel" style="width: 100%;">Cancel</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  overlay.querySelectorAll('.variant-option-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const variant = product.variants.find((v) => v.id === btn.dataset.variantId);
+      addVariantToCart(product, variant);
+      overlay.remove();
+    });
+  });
+  document.getElementById('variant-picker-cancel').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+}
+
+function addVariantToCart(product, variant) {
+  const existing = cart.find((line) => line.variant.id === variant.id);
   if (existing) {
     existing.quantity += 1;
   } else {
-    cart.push({ product, quantity: 1 });
+    cart.push({ product, variant, quantity: 1 });
   }
   renderCart();
 }
 
-function setQuantity(productId, quantity) {
-  const line = cart.find((l) => l.product.id === productId);
+// Mirrors how a USB/Bluetooth barcode scanner behaves: types the full code, then sends an
+// Enter keystroke. An exact barcode (or SKU) match resolves straight to that variant --
+// no picker needed, since scanning already identifies the specific size/color.
+function tryResolveExactScan(term) {
+  const trimmed = term.trim();
+  if (!trimmed) return false;
+  for (const p of products) {
+    const variant = p.variants.find((v) => v.barcode === trimmed || v.sku === trimmed);
+    if (variant) {
+      addVariantToCart(p, variant);
+      return true;
+    }
+  }
+  return false;
+}
+
+function setQuantity(variantId, quantity) {
+  const line = cart.find((l) => l.variant.id === variantId);
   if (!line) return;
   if (quantity <= 0) {
-    cart = cart.filter((l) => l.product.id !== productId);
+    cart = cart.filter((l) => l.variant.id !== variantId);
   } else {
     line.quantity = quantity;
   }
@@ -160,11 +262,12 @@ function renderCart() {
 
   const linesHtml =
     cart
-      .map(
-        (line) => `
-      <div class="cart-line" data-id="${line.product.id}">
+      .map((line) => {
+        const label = variantLabel(line.variant);
+        return `
+      <div class="cart-line" data-id="${line.variant.id}">
         <div>
-          <div>${line.product.name}</div>
+          <div>${line.product.name}${label ? ` — ${label}` : ''}</div>
           <div style="color: var(--text-muted); font-size: 0.8rem;">
             ${formatCents(currentPriceCents(line.product), line.product.currency)} each
           </div>
@@ -174,15 +277,15 @@ function renderCart() {
           <span>${line.quantity}</span>
           <button type="button" class="ghost qty-plus">+</button>
         </div>
-      </div>`
-      )
+      </div>`;
+      })
       .join('') || '<p style="color: var(--text-muted);">Cart is empty — tap a product to add it.</p>';
 
   container.innerHTML = warningHtml + linesHtml;
 
   container.querySelectorAll('.cart-line').forEach((el) => {
     const id = el.dataset.id;
-    const line = cart.find((l) => l.product.id === id);
+    const line = cart.find((l) => l.variant.id === id);
     el.querySelector('.qty-plus').addEventListener('click', () => setQuantity(id, line.quantity + 1));
     el.querySelector('.qty-minus').addEventListener('click', () => setQuantity(id, line.quantity - 1));
   });
@@ -206,7 +309,17 @@ function renderTotals() {
 }
 
 function wireControls() {
-  document.getElementById('product-search').addEventListener('input', (e) => renderProductGrid(e.target.value));
+  const searchInput = document.getElementById('product-search');
+  searchInput.addEventListener('input', (e) => renderProductGrid(e.target.value));
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (tryResolveExactScan(searchInput.value)) {
+      searchInput.value = '';
+      renderProductGrid('');
+    }
+  });
+
   document.getElementById('cart-discount').addEventListener('input', renderTotals);
   document.getElementById('cart-tax').addEventListener('input', renderTotals);
 
@@ -252,11 +365,12 @@ async function completeSale() {
     created_at: nowIso, // the sale's OWN moment -- what the cost-snapshot trigger keys off
   };
 
-  // unit_cost_at_sale_cents is intentionally NOT included -- the server populates it. See
-  // fn_populate_sale_item_cost_snapshot in the sales_and_returns migration.
+  // unit_cost_at_sale_cents is intentionally NOT included -- the server populates it (via
+  // variant_id -> product_id -> product_cost_history). See fn_populate_sale_item_cost_snapshot
+  // in the sales_and_returns / product_variants migrations.
   const items = cart.map((line) => ({
     id: crypto.randomUUID(),
-    product_id: line.product.id,
+    variant_id: line.variant.id,
     quantity: line.quantity,
     unit_selling_price_cents: currentPriceCents(line.product),
     currency,
@@ -311,6 +425,7 @@ async function completeSale() {
 
   const receiptLines = cart.map((line) => ({
     name: line.product.name,
+    variantLabel: variantLabel(line.variant),
     quantity: line.quantity,
     unitPriceCents: currentPriceCents(line.product),
   }));

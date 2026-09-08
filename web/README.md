@@ -39,11 +39,17 @@ individually. Current status:
   approach as the checkout receipt. A variant with no barcode on file falls back to
   encoding its SKU. **No migration needed for this step** — it's a pure rendering feature
   over data `admin.html` already has, nothing new to persist.
-- ⏳ **`pos.html` (checkout) is currently broken** — it still queries products by the old
-  flat-SKU shape (`product_id` on `sale_items`, prices/sku joined directly off `products`).
-  Reworking it for a size/color picker is step 4, deliberately scoped as its own reviewable
-  change rather than bundled into step 2 or 3. Until then, checkout will not load products
-  correctly against either a real Supabase project or the current `mockClient.js`.
+- ✅ **Step 4** (checkout): `pos.html` reworked for variants. Tapping a product with exactly
+  one variant adds it straight to the cart (the common case for a product with no real
+  size/color variation); tapping one with more than one opens a picker showing each
+  size/color option (with a live stock count per option). The search box still filters the
+  grid as you type, and now also matches on any variant's SKU/barcode; pressing **Enter**
+  with the box containing an exact variant barcode or SKU resolves straight to that variant
+  and adds it — the same behavior a USB/Bluetooth barcode scanner produces (it types the
+  code, then sends an Enter keystroke), so a plug-in scanner works with zero extra
+  integration. The offline cache (`js/db.js`) now stores variants alongside products so
+  this all still works with no connection. `js/receipt.js` shows each line's size/color
+  alongside the product name.
 - Steps 5 (purchase orders/transfers), 6 (returns), 7 (receipts, partly done — see below),
   8 (customers), 9 (promotions), 10 (reporting), 11 (low-stock alerts) are still ahead.
 
@@ -71,16 +77,18 @@ with (Supabase Studio's Authentication tab, or `supabase auth` CLI, then insert 
 ## What's actually built in this pass
 
 - **`index.html`** — login (Supabase email/password auth).
-- **`pos.html`** — **currently broken, see "Fashion-retail evolution" above.** Prior to the
-  product_variants migration it had: a full checkout flow (product/price grid with
-  retail/wholesale toggle, cart, discount/tax, one payment method per sale), the offline
-  path (queued in IndexedDB, replayed automatically once connectivity returns via
-  `js/db.js` and `js/sync.js`), and a printable Subtle Accessories receipt
-  (`js/receipt.js`) with a "Print" button (`window.print()` and `@media print` rules that
-  hide everything but the receipt — works with any regular printer; thermal receipt
-  printer integration is hardware-specific follow-up work, not built here). All of that
-  logic is still in place and will carry over once step 4 reworks it to pick a variant
-  instead of a bare product.
+- **`pos.html`** — full checkout flow, variant-aware (see step 4 above): product grid
+  (retail or wholesale toggle, respecting `min_wholesale_qty`) where a multi-variant
+  product opens a size/color picker and a single-variant one adds straight to cart; a
+  search box that resolves an exact barcode/SKU scan directly to its variant on Enter;
+  cart, discount/tax entry, one payment method per sale; the offline path (queued in
+  IndexedDB — now caching variants alongside products — replayed automatically once
+  connectivity returns via `js/db.js` + `js/sync.js`); and a printable Subtle Accessories
+  receipt (`js/receipt.js`, showing each line's size/color) with a "Print" button
+  (`window.print()` + `@media print` rules that hide everything but the receipt — works
+  with any regular printer; thermal receipt printer integration is hardware-specific
+  follow-up work, not built here). Responsive down to phone width — this is the page meant
+  to run on a laptop, tablet, or phone at checkout.
 - **`inventory.html`** — read-only stock levels **per variant** per location, manager/owner
   only (cost column comes from `v_inventory_balances`, which the database itself nulls out
   for anyone else). Shows product name, size/color, SKU, location, quantity, and cost.
@@ -127,11 +135,10 @@ with (Supabase Studio's Authentication tab, or `supabase auth` CLI, then insert 
 - Returns/refunds UI — the DB logic (`sale_item_returns`) exists and works, no screen calls
   it yet.
 - Expenses entry, the profitability dashboard.
-- Barcode *scanning* (a camera/scanner feeding the product search box) and printed barcode
-  *labels* (step 3) — barcode now lives on `product_variants`, which `pos.js` doesn't
-  search yet (see "Fashion-retail evolution" above); a USB/Bluetooth barcode scanner that
-  types-and-presses-Enter will work once step 4 wires variant search back up, with no
-  extra code needed for that class of scanner. A camera-based scanner UI is not built.
+- Barcode *scanning* via camera — a USB/Bluetooth barcode scanner (the common
+  types-then-Enter kind) works today against `pos.js`'s search box with no extra
+  integration (see step 4 above). A camera-based scanner UI (using a phone's own camera to
+  read a barcode, for a device with no separate scanner hardware) is not built.
 - Multi-currency **split** tender — `sale_payments` supports more than one payment row per
   sale, but the checkout UI only ever writes one. Full split-tender UI is a stretch goal.
 - Location picker on checkout — `pos.js` always sells at `profile.primary_location_id`.

@@ -165,6 +165,28 @@ button.ghost {
 .product-tile:hover { border-color: var(--brand); }
 .product-tile .name { font-weight: 600; font-size: 0.9rem; display: block; }
 .product-tile .price { color: var(--text-muted); font-size: 0.85rem; }
+.product-tile .variant-count {
+  display: block; margin-top: 0.25rem; font-size: 0.7rem; color: var(--brand-dark);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+
+.variant-picker-overlay {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45);
+  display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 50;
+}
+.variant-picker-card {
+  background: var(--surface); border-radius: var(--radius); padding: 1.25rem;
+  width: 100%; max-width: 340px; max-height: 85vh; overflow-y: auto;
+}
+.variant-picker-card h2 { margin: 0; font-size: 1.05rem; }
+.variant-picker-options { display: flex; flex-direction: column; gap: 0.5rem; margin: 0.75rem 0 1rem; }
+.variant-option-btn {
+  display: flex; justify-content: space-between; align-items: center;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface);
+  padding: 0.65rem 0.85rem; cursor: pointer; font-size: 0.95rem;
+}
+.variant-option-btn:hover { border-color: var(--brand); }
+.variant-qty { color: var(--text-muted); font-size: 0.8rem; }
 
 .cart-line { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.4rem 0; border-bottom: 1px solid var(--border); }
 .cart-line .qty-controls { display: flex; align-items: center; gap: 0.4rem; }
