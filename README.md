@@ -66,6 +66,19 @@ table/field-name parity. Places most likely to drift from the source document:
 - **`product_variants` (size/color/SKU/barcode/stock) keeps price and cost at the product
   level**, shared across all of a product's variants — only identity and physical stock
   move down to the variant. See `20260901091000_product_variants.sql`'s header comment.
+- **Purchase order receiving deliberately reuses `stock_receipts`/`stock_receipt_items`**
+  rather than giving POs their own stock/cost logic — `purchase_orders.id` is just
+  traceability on the receipt. `quantity_received`/status on the PO itself are updated by
+  the app after each receipt, not a DB trigger, since that's workflow status, not financial
+  history like the receipt itself is.
+- **`sale_item_returns.refund_method` records `'store_credit'` as a choice, not a ledger** —
+  there's no running credit balance or redemption at checkout. Building that is its own
+  feature once it's actually needed.
+- **Receipt sharing favors zero-infrastructure options**: WhatsApp via a `wa.me` text link,
+  email via `mailto:`, both because there's no backend email/messaging service to call.
+  Thermal printing (`web/js/thermal-print.js`) uses WebUSB + ESC/POS and is **untested
+  against real hardware** — no printer was available to verify against; the byte sequence
+  follows the spec, but a specific printer model may need endpoint/vendor adjustments.
 
 ## Layout
 
@@ -75,7 +88,7 @@ supabase/
   tests/
     immutability_test.sql   -- verifies changing a product's cost never changes a past sale's profit
 web/
-  index.html, pos.html, ...  -- plain multi-page frontend (see web/README.md once it exists)
+  index.html, pos.html, ...  -- plain multi-page frontend (see web/README.md for exactly what each page does)
 ```
 
 ## Applying the schema
@@ -95,7 +108,9 @@ No Supabase project exists yet for Subtle POS. To stand this up:
 The project is now also mid-way through an 11-step fashion-retail evolution (size/color
 variants, purchase orders, returns, promotions, reporting, low-stock alerts) reviewed one
 step at a time — see `web/README.md`'s "Fashion-retail evolution" section for exact status.
-Steps 1 (data model), 2 (admin: product + variant creation), 3 (barcode labels), and 4
-(checkout: variant picker + exact-barcode-scan resolution) are all done — `web/pos.html` is
-fully working again. Still ahead: purchase orders/transfers, returns, customers,
-promotions, reporting, and low-stock alerts (steps 5–11).
+Steps 1–8 are done: data model, admin (product + variant creation), barcode labels,
+checkout (variant picker + exact-barcode-scan resolution), purchase orders & transfers,
+returns, receipts (WhatsApp/email/thermal-print additions — thermal untested against real
+hardware), and customers. Still ahead: promotions, reporting, and low-stock alerts
+(steps 9–11) — see `web/README.md`'s "Fashion-retail evolution" section for exactly what
+each finished step does and doesn't cover.

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Subtle POS — Returns</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="icons/favicon.png" />
+  <link rel="apple-touch-icon" href="icons/favicon.png" />
+  <meta name="theme-color" content="#17563b" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <nav id="app-nav"></nav>
+
+  <main>
+    <h1>Find a sale to return</h1>
+    <div class="card">
+      <div class="form-grid">
+        <label>Receipt # <input type="text" id="search-receipt" placeholder="first few characters" /></label>
+        <label>Customer name or phone <input type="text" id="search-customer" /></label>
+        <label>From date <input type="date" id="search-from" /></label>
+        <label>To date <input type="date" id="search-to" /></label>
+      </div>
+      <button type="button" id="search-btn" class="primary" style="margin-top: 0.75rem;">Search</button>
+    </div>
+
+    <div id="search-results" style="margin-top: 1rem;"></div>
+    <div id="return-detail" style="margin-top: 1rem;"></div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="js/returns.js"></script>
+</body>
+</html>

@@ -337,6 +337,29 @@ function setSaleType(type) {
   renderCart();
 }
 
+// STEP 8: customer lookup/attach at checkout. Deliberately online-only -- unlike the sale
+// itself (which always queues and syncs later), finding-or-creating a customer needs a
+// real round trip to check for a phone match, and skipping it while offline is harmless:
+// the sale still completes and syncs normally, just without a customer_id attached.
+async function resolveCustomerId(client) {
+  const name = document.getElementById('customer-name').value.trim();
+  const phone = document.getElementById('customer-phone').value.trim();
+  if (!name && !phone) return null;
+  if (!navigator.onLine) return null;
+
+  try {
+    if (phone) {
+      const { data: existing } = await client.from('customers').select('id').eq('phone', phone);
+      if (existing?.[0]) return existing[0].id;
+    }
+    const id = crypto.randomUUID();
+    await client.from('customers').insert({ id, name: name || 'Walk-in customer', phone: phone || null });
+    return id;
+  } catch {
+    return null; // a customer-lookup hiccup should never block the sale itself
+  }
+}
+
 async function completeSale() {
   const errorEl = document.getElementById('checkout-error');
   errorEl.textContent = '';
@@ -348,6 +371,7 @@ async function completeSale() {
   const taxCents = Math.max(0, toCents(document.getElementById('cart-tax').value || 0));
   const totalCents = Math.max(0, subtotalCents - discountCents + taxCents);
   const paymentMethod = document.getElementById('payment-method').value;
+  const customerId = navigator.onLine ? await resolveCustomerId(getClient()) : null;
 
   const saleId = crypto.randomUUID();
   const nowIso = new Date().toISOString();
@@ -362,6 +386,7 @@ async function completeSale() {
     discount_cents: discountCents,
     tax_cents: taxCents,
     total_cents: totalCents,
+    customer_id: customerId,
     created_at: nowIso, // the sale's OWN moment -- what the cost-snapshot trigger keys off
   };
 
@@ -433,6 +458,8 @@ async function completeSale() {
   cart = [];
   document.getElementById('cart-discount').value = 0;
   document.getElementById('cart-tax').value = 0;
+  document.getElementById('customer-name').value = '';
+  document.getElementById('customer-phone').value = '';
   renderCart();
   await refreshStatusBanner();
   replayOutbox(refreshStatusBanner);

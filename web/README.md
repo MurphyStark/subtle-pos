@@ -50,8 +50,44 @@ individually. Current status:
   integration. The offline cache (`js/db.js`) now stores variants alongside products so
   this all still works with no connection. `js/receipt.js` shows each line's size/color
   alongside the product name.
-- Steps 5 (purchase orders/transfers), 6 (returns), 7 (receipts, partly done — see below),
-  8 (customers), 9 (promotions), 10 (reporting), 11 (low-stock alerts) are still ahead.
+- ✅ **Step 5** (purchase orders & transfers): `purchase-orders.html` raises a PO against a
+  supplier (per-variant lines: quantity + expected cost), then "Record receipt" against it
+  creates a real `stock_receipts`/`stock_receipt_items` row (the exact mechanism admin.js
+  already uses) rather than duplicating stock/cost logic — this correctly recomputes
+  weighted-average cost via the existing trigger. Partial receipts are supported; the PO's
+  own status (`sent` → `partially_received` → `received`) is recalculated by the app after
+  each receipt, not by a database trigger, since that's workflow status, not financial
+  history. `transfers.html` covers the "simple" stock-transfer flow: request a transfer of
+  a variant between locations (any role can request FROM their own location, matching the
+  RLS already built for this back in the original schema), then a manager/owner can
+  "Approve & mark received" in one step, which snapshots the source location's
+  weighted-average cost onto the transfer and blends it into the destination's average
+  once received.
+- ✅ **Step 6** (returns): `returns.html` searches past sales by receipt number, date range,
+  or customer name/phone, then lets you select a returnable line, capture a reason (wrong
+  size, defect, changed mind, other) and a refund method (cash, card, or store credit), and
+  processes it — reversing COGS/gross profit using the *original* recorded unit cost (never
+  today's), restocking the correct variant at the original sale's location, and logging the
+  acting user, all via the `sale_item_returns` mechanism that already existed in the schema
+  from the very first migration. Over-returning beyond what was actually sold is rejected.
+  **Scope note:** "store credit" as a refund method is recorded, but there's no credit
+  ledger/balance or redemption at checkout — that would be its own feature.
+- ⏳ **Step 7** (receipts) — itemized/taxes/payment/cashier/timestamp already existed. Added:
+  a "WhatsApp" button (a `wa.me` link pre-filled with a plain-text receipt — this is the
+  offline-friendly default, since building the link needs no network, only actually sending
+  it does), an "Email" button (`mailto:` with the receipt as the body — there's no backend
+  email service here, so a person still has to hit send), and, where the browser supports it
+  (`js/thermal-print.js`, desktop Chrome/Edge or Android Chrome only — not Safari or
+  Firefox), a "Thermal print" button using WebUSB + ESC/POS commands. **The thermal path is
+  UNTESTED against real hardware** — no printer was available in this environment; the
+  command bytes follow the ESC/POS spec but a specific printer may need adjustment.
+- ✅ **Step 8** (customers): a lightweight `customers` table (name, phone, optional email).
+  `pos.html` gained optional name/phone fields at checkout that find-or-create a customer by
+  phone (so ringing up the same regular twice doesn't create two records) and attach
+  `customer_id` to the sale; leaving both blank keeps checkout exactly as it was before this
+  step (an anonymous sale). `customers.html` lists/searches customers and shows each one's
+  purchase history.
+- Steps 9 (promotions), 10 (reporting), 11 (low-stock alerts) are still ahead.
 
 ## Demo mode
 
@@ -118,22 +154,42 @@ with (Supabase Studio's Authentication tab, or `supabase auth` CLI, then insert 
   triggers the reconciliation (`fn_apply_stock_count_completion` in the real schema,
   mirrored in `mockClient.js` for demo mode) that sets `quantity_available` to exactly what
   was physically counted.
+- **`purchase-orders.html`** — manager/owner only. Raise a PO (supplier — typed name,
+  found-or-created — destination location, currency, per-variant lines of quantity +
+  expected cost), then record receipts against it (full or partial); each receipt is a real
+  `stock_receipts`/`stock_receipt_items` row, so cost/stock update exactly like any other
+  receipt in the system. The PO card shows ordered/received/remaining per line and its own
+  status.
+- **`transfers.html`** — any role can request a transfer of a variant from their own
+  location; a manager/owner can "Approve & mark received" in one step. Snapshots the
+  source's weighted-average cost onto the transfer so the destination's average stays
+  correct once it lands.
+- **`returns.html`** — search a sale by receipt #, date range, or customer; process a
+  return per line with a reason and refund method, restocking the right variant/location
+  and reversing COGS/profit using the sale's original recorded cost. Over-returning is
+  rejected.
+- **`customers.html`** — add/search customers, view each one's purchase history.
+  `pos.html` gained optional name/phone fields that attach a customer to a sale.
+- Every page above ships with a working `mockClient.js` implementation too — none of this
+  needs a live Supabase project to try.
 
 ## What's NOT built yet (still ahead, per the build prompt's step order)
 
 - Editing a product's name/description after creation, editing a variant's size/color/
   SKU/barcode, or deactivating either — `admin.html` only creates products/variants and
   updates prices right now.
-- Adding stock to an *existing* variant (a proper "receive stock" flow) — today, more stock
-  only arrives via `admin.html`'s one-time variant-creation receipt or a stock take
-  correcting the count upward. A dedicated receiving screen with landed-cost fields
-  (freight/customs/etc., which the schema already supports) is still ahead.
-- Supplier management UI — `admin.html` auto-creates/reuses a single "Manual Entry" supplier
-  for every product; there's no screen to add real suppliers yet.
-- Stock transfers UI (moving stock between the two locations) — the DB logic exists and
-  works, no screen calls it yet.
-- Returns/refunds UI — the DB logic (`sale_item_returns`) exists and works, no screen calls
-  it yet.
+- A quick "just add stock to a variant" shortcut with no paperwork — stock now arrives via
+  `admin.html`'s variant-creation receipt, `purchase-orders.html`'s PO receiving (step 5),
+  or a stock take correcting the count upward. All three go through the real
+  `stock_receipts`/`stock_receipt_items` mechanism (or, for a stock take, direct
+  reconciliation) — there's just no single-field "add N units" bypass for a manager who
+  doesn't want to raise a PO first. A receiving screen with landed-cost fields
+  (freight/customs/etc., which the schema already supports) is also still ahead — PO
+  receiving currently treats the PO line's expected cost as the actual landed cost.
+- A dedicated supplier list/edit screen — `admin.html` still auto-creates/reuses "Manual
+  Entry" for its own quick product setup, but `purchase-orders.html` (step 5) now lets you
+  type a real supplier name, which is found-or-created properly; there's just no page to
+  browse/edit the supplier list itself yet.
 - Expenses entry, the profitability dashboard.
 - Barcode *scanning* via camera — a USB/Bluetooth barcode scanner (the common
   types-then-Enter kind) works today against `pos.js`'s search box with no extra

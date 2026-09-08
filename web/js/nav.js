@@ -14,7 +14,10 @@ export function renderNav(profile) {
     <div class="nav-links">
       <a href="pos.html">Checkout</a>
       <a href="stock-take.html">Stock Take</a>
-      ${isManager ? '<a href="inventory.html">Inventory</a><a href="admin.html">Admin</a>' : ''}
+      <a href="returns.html">Returns</a>
+      <a href="customers.html">Customers</a>
+      <a href="transfers.html">Transfers</a>
+      ${isManager ? '<a href="inventory.html">Inventory</a><a href="admin.html">Admin</a><a href="purchase-orders.html">Purchase Orders</a>' : ''}
     </div>
     <div class="nav-user">
       <span>${profile.full_name} · ${profile.role.replace('_', ' ')}</span>

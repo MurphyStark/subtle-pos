@@ -11,10 +11,7 @@
 // SHAPE NOTE: this mirrors the real schema's product_variants model (see the
 // product_variants migration) -- products carry name/description/currency/pricing/cost
 // only; sku/barcode/physical stock live on product_variants. Every product has at least
-// one variant, same as the real migration's zero-data-loss backfill guarantees. pos.js
-// (checkout) has not been reworked for this shape yet (that's a later step), so it will
-// not function correctly against this file until it is -- admin.html, inventory.html, and
-// stock-take.html are what this pass keeps working.
+// one variant, same as the real migration's zero-data-loss backfill guarantees.
 
 const STATE_KEY = 'subtle-pos-demo-state-v2';
 const SESSION_KEY = 'subtle-pos-demo-session-v1';
@@ -159,6 +156,12 @@ function buildSeed() {
     sales: [],
     sale_items: [],
     sale_payments: [],
+    sale_item_returns: [],
+    purchase_orders: [],
+    purchase_order_items: [],
+    inventory_transfers: [],
+    inventory_transfer_items: [],
+    customers: [],
     imageStore: {},
   };
 }
@@ -244,6 +247,19 @@ function tableRows(table) {
       return state.sale_items;
     case 'sale_payments':
       return state.sale_payments;
+    case 'sale_item_returns':
+    case 'v_sale_item_returns':
+      return state.sale_item_returns;
+    case 'purchase_orders':
+      return state.purchase_orders;
+    case 'purchase_order_items':
+      return state.purchase_order_items;
+    case 'inventory_transfers':
+      return state.inventory_transfers;
+    case 'inventory_transfer_items':
+      return state.inventory_transfer_items;
+    case 'customers':
+      return state.customers;
     default:
       return [];
   }
@@ -327,14 +343,85 @@ function applyStockCountCompletion(stockCountRow) {
   }
 }
 
+// Mirrors fn_apply_transfer_receipt: moves stock (and blends weighted-average cost) from
+// the source location to the destination once a transfer reaches received/partially
+// received. Deducts the source unconditionally -- by the time a transfer is marked
+// received, the stock has already physically left the source location.
+function applyTransferReceipt(transferRow) {
+  const items = state.inventory_transfer_items.filter(
+    (i) => i.inventory_transfer_id === transferRow.id && (i.quantity_received ?? 0) > 0
+  );
+  for (const item of items) {
+    const fromBalance = findOrCreateBalance(item.variant_id, transferRow.from_location_id);
+    fromBalance.quantity_available -= item.quantity_received;
+    fromBalance.updated_at = new Date().toISOString();
+
+    const toBalance = findOrCreateBalance(item.variant_id, transferRow.to_location_id);
+    const existingQty = toBalance.quantity_available;
+    const existingAvg = toBalance.average_unit_cost_cents;
+    const incomingQty = item.quantity_received;
+    const incomingCost = item.unit_cost_at_transfer_cents ?? 0;
+    const newAvg =
+      existingQty + incomingQty === 0
+        ? 0
+        : Math.round((existingQty * existingAvg + incomingQty * incomingCost) / (existingQty + incomingQty));
+    toBalance.quantity_available = existingQty + incomingQty;
+    toBalance.average_unit_cost_cents = newAvg;
+    toBalance.updated_at = new Date().toISOString();
+  }
+}
+
+// Mirrors fn_process_sale_item_return: validates the return quantity against what's still
+// returnable, defaults restock_location_id to the original sale's location, and reverses
+// COGS/gross profit using the ORIGINAL recorded unit cost -- never today's cost. Mutates
+// `row` in place before it's stored, the same way a BEFORE INSERT trigger mutates NEW.
+function processSaleItemReturn(row) {
+  const saleItem = state.sale_items.find((i) => i.id === row.sale_item_id);
+  if (!saleItem) throw new Error(`Unknown sale_item ${row.sale_item_id} for return`);
+
+  const alreadyReturned = state.sale_item_returns
+    .filter((r) => r.sale_item_id === row.sale_item_id)
+    .reduce((sum, r) => sum + r.quantity_returned, 0);
+  if (alreadyReturned + row.quantity_returned > saleItem.quantity) {
+    throw new Error(
+      `Cannot return ${row.quantity_returned} units: only ${saleItem.quantity - alreadyReturned} of ${saleItem.quantity} remain returnable`
+    );
+  }
+
+  if (!row.restock_location_id) {
+    const sale = state.sales.find((s) => s.id === saleItem.sale_id);
+    row.restock_location_id = sale?.location_id ?? null;
+  }
+
+  row.cogs_reversed_cents = row.quantity_returned * saleItem.unit_cost_at_sale_cents;
+  row.gross_profit_reversed_cents =
+    row.quantity_returned * (saleItem.unit_selling_price_cents - saleItem.unit_cost_at_sale_cents);
+}
+
+// Mirrors fn_restock_sale_item_return: puts the returned quantity back into stock at
+// whatever restock_location_id was resolved to above.
+function restockSaleItemReturn(row) {
+  const saleItem = state.sale_items.find((i) => i.id === row.sale_item_id);
+  if (!saleItem) return;
+  const balance = findOrCreateBalance(saleItem.variant_id, row.restock_location_id);
+  balance.quantity_available += row.quantity_returned;
+  balance.updated_at = new Date().toISOString();
+}
+
 function applyWrite(table, rows) {
   const target = tableRows(table);
-  for (const row of rows) {
-    if (target.find((r) => r.id === row.id)) continue; // upsert + ignoreDuplicates semantics
-    target.push(row);
-    if (table === 'sale_items') applySaleItemStockImpact(row);
-    if (table === 'stock_receipt_items') applyStockReceiptItem(row);
-    if (table === 'stock_counts' && row.status === 'completed') applyStockCountCompletion(row);
+  try {
+    for (const row of rows) {
+      if (target.find((r) => r.id === row.id)) continue; // upsert + ignoreDuplicates semantics
+      if (table === 'sale_item_returns') processSaleItemReturn(row); // may throw; mutates row
+      target.push(row);
+      if (table === 'sale_items') applySaleItemStockImpact(row);
+      if (table === 'stock_receipt_items') applyStockReceiptItem(row);
+      if (table === 'stock_counts' && row.status === 'completed') applyStockCountCompletion(row);
+      if (table === 'sale_item_returns') restockSaleItemReturn(row);
+    }
+  } catch (err) {
+    return { data: null, error: { message: err.message } };
   }
   saveState(state);
   return { data: null, error: null };
@@ -345,9 +432,13 @@ function applyUpdate(table, patch, filters) {
   const matches = target.filter((r) => filters.every((f) => f(r)));
   for (const row of matches) {
     const wasCompleted = row.status === 'completed';
+    const wasReceived = row.status === 'received' || row.status === 'partially_received';
     Object.assign(row, patch);
     if (table === 'stock_counts' && row.status === 'completed' && !wasCompleted) {
       applyStockCountCompletion(row);
+    }
+    if (table === 'inventory_transfers' && !wasReceived && (row.status === 'received' || row.status === 'partially_received')) {
+      applyTransferReceipt(row);
     }
   }
   saveState(state);

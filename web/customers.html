@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Subtle POS — Customers</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="icons/favicon.png" />
+  <link rel="apple-touch-icon" href="icons/favicon.png" />
+  <meta name="theme-color" content="#17563b" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <nav id="app-nav"></nav>
+
+  <main>
+    <h1>Add a customer</h1>
+    <div class="card">
+      <form id="customer-form" class="admin-form">
+        <div class="form-grid">
+          <label>Name <input type="text" name="name" required /></label>
+          <label>Phone <input type="tel" name="phone" /></label>
+          <label>Email <input type="email" name="email" /></label>
+        </div>
+        <button type="submit" class="primary">Add customer</button>
+        <p class="error" id="customer-error"></p>
+      </form>
+    </div>
+
+    <h1 style="margin-top: 1.5rem;">Customers</h1>
+    <input type="search" id="customer-search" class="product-search" placeholder="Search by name or phone…" />
+    <div id="customer-list"></div>
+    <div id="customer-detail" style="margin-top: 1rem;"></div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="js/customers.js"></script>
+</body>
+</html>
