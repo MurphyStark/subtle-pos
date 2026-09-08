@@ -31,14 +31,21 @@ individually. Current status:
   SKU, initial qty/location) under it, including to an already-existing product.
   `inventory.html` and `stock-take.html` were updated alongside it (not a numbered step of
   their own, but a direct consequence of the data model change they both depend on).
+- ✅ **Step 3** (barcode labels): a "Print label" button per variant and "Print all labels
+  for this product" per product on `admin.html`, rendering a CODE128 barcode (via the
+  JsBarcode CDN script) plus product name, size/color, SKU, and retail price, sized for a
+  standard 50mm×25mm label printer. Printed via the browser's native print dialog (which
+  itself offers "Save as PDF" as a destination) rather than a PDF-generation library — same
+  approach as the checkout receipt. A variant with no barcode on file falls back to
+  encoding its SKU. **No migration needed for this step** — it's a pure rendering feature
+  over data `admin.html` already has, nothing new to persist.
 - ⏳ **`pos.html` (checkout) is currently broken** — it still queries products by the old
   flat-SKU shape (`product_id` on `sale_items`, prices/sku joined directly off `products`).
   Reworking it for a size/color picker is step 4, deliberately scoped as its own reviewable
-  change rather than bundled into step 2. Until then, checkout will not load products
+  change rather than bundled into step 2 or 3. Until then, checkout will not load products
   correctly against either a real Supabase project or the current `mockClient.js`.
-- Steps 3 (barcode labels), 5 (purchase orders/transfers), 6 (returns), 7 (receipts, partly
-  done — see below), 8 (customers), 9 (promotions), 10 (reporting), 11 (low-stock alerts)
-  are still ahead.
+- Steps 5 (purchase orders/transfers), 6 (returns), 7 (receipts, partly done — see below),
+  8 (customers), 9 (promotions), 10 (reporting), 11 (low-stock alerts) are still ahead.
 
 ## Demo mode
 
@@ -93,6 +100,8 @@ with (Supabase Studio's Authentication tab, or `supabase auth` CLI, then insert 
   doesn't need to be — they go to Supabase Storage's `product-images` bucket in real mode,
   or a `localStorage`-backed mock in demo mode (see below). Price updates insert a new
   append-only `product_prices` row per the immutability design, never editing the old one.
+  Each variant row has a "Print label" button, and each product has a "Print all labels"
+  button, both rendering barcode/price labels via `js/labels.js` (see step 3 above).
 - **`stock-take.html`** — counts **variants**, not products (a size/color has its own stock,
   so it has its own count). Any role can count their own location; managers/owner can pick
   either. Shows system quantity vs. a counted-quantity input per variant with a live

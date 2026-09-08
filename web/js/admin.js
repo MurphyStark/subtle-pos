@@ -4,6 +4,7 @@ import { formatCents, toCents } from './money.js';
 import { renderNav } from './nav.js';
 import { registerServiceWorker } from './pwa.js';
 import { resizeImage } from './image.js';
+import { printLabels } from './labels.js';
 
 // Manager/owner only -- RLS enforces this independently (products/product_variants/
 // product_prices writes all require is_manager_or_owner(), and product_cost_history is
@@ -215,6 +216,16 @@ async function handleAddVariant(product, form) {
   }
 }
 
+function buildLabelItem(product, variant, retail, currency) {
+  return {
+    productName: product.name,
+    variantLabel: [variant.size, variant.color].filter(Boolean).join(' / '),
+    sku: variant.sku,
+    barcode: variant.barcode,
+    priceText: retail ? formatCents(retail.unit_price_cents, currency) : '',
+  };
+}
+
 function renderVariantAddForm(product) {
   return `
     <form class="add-variant-form add-variant-form-target" data-product-id="${product.id}">
@@ -286,9 +297,10 @@ async function renderProductList() {
                 <td>${v.sku}</td>
                 <td>${v.barcode ?? '—'}</td>
                 <td>${stockByLoc || '0'}</td>
+                <td><button type="button" class="ghost print-label-btn" data-product-id="${p.id}" data-variant-id="${v.id}">Print label</button></td>
               </tr>`;
             })
-            .join('') || '<tr><td colspan="5" style="color: var(--text-muted);">No variants yet — this product cannot be sold until one exists.</td></tr>';
+            .join('') || '<tr><td colspan="6" style="color: var(--text-muted);">No variants yet — this product cannot be sold until one exists.</td></tr>';
 
         return `
         <div class="card product-card">
@@ -307,10 +319,11 @@ async function renderProductList() {
               <button type="button" class="ghost save-price-btn" data-id="${p.id}" data-currency="${currency}">Update price</button>
             </div>
             <table class="variant-table">
-              <thead><tr><th>Size</th><th>Color</th><th>SKU</th><th>Barcode</th><th>Stock by location</th></tr></thead>
+              <thead><tr><th>Size</th><th>Color</th><th>SKU</th><th>Barcode</th><th>Stock by location</th><th></th></tr></thead>
               <tbody>${variantRows}</tbody>
             </table>
-            <h2 style="font-size: 0.95rem;">Add a variant</h2>
+            ${productVariants.length > 0 ? `<button type="button" class="ghost print-all-labels-btn" data-id="${p.id}">Print all labels for this product</button>` : ''}
+            <h2 style="font-size: 0.95rem; margin-top: 1rem;">Add a variant</h2>
             ${renderVariantAddForm(p)}
           </div>
         </div>`;
@@ -331,6 +344,26 @@ async function renderProductList() {
       const wholesaleVal = row.querySelector('.edit-wholesale').value;
       if (retailVal) await updatePrice(btn.dataset.id, 'retail', btn.dataset.currency, retailVal);
       if (wholesaleVal) await updatePrice(btn.dataset.id, 'wholesale', btn.dataset.currency, wholesaleVal);
+    });
+  });
+  container.querySelectorAll('.print-label-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const product = (products ?? []).find((p) => p.id === btn.dataset.productId);
+      const variant = (variants ?? []).find((v) => v.id === btn.dataset.variantId);
+      const retail = latestPrice[`${product.id}:retail`];
+      printLabels([buildLabelItem(product, variant, retail, retail?.currency ?? product.base_currency)]);
+    });
+  });
+  container.querySelectorAll('.print-all-labels-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const product = (products ?? []).find((p) => p.id === btn.dataset.id);
+      const retail = latestPrice[`${product.id}:retail`];
+      const items = (variantsByProduct[product.id] ?? []).map((v) =>
+        buildLabelItem(product, v, retail, retail?.currency ?? product.base_currency)
+      );
+      printLabels(items);
     });
   });
   container.querySelectorAll('.add-variant-form-target').forEach((form) => {
