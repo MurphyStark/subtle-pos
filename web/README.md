@@ -160,9 +160,12 @@ with (Supabase Studio's Authentication tab, or `supabase auth` CLI, then insert 
 ## What's actually built in this pass
 
 - **`index.html`** — login (Supabase email/password auth).
-- **`pos.html`** — full checkout flow, variant-aware (see step 4 above): product grid
-  (retail or wholesale toggle, respecting `min_wholesale_qty`) where a multi-variant
-  product opens a size/color picker and a single-variant one adds straight to cart; a
+- **`pos.html`** — full checkout flow, variant-aware (see step 4 above): a product grid,
+  always at retail price (the Retail/Wholesale toggle was removed — every sale is
+  `sale_type: 'retail'` now; wholesale as a *pricing tier* on a product is untouched and
+  still editable in `admin.html`, there's just no way to sell at that price from the till
+  any more), where a multi-variant product opens a size/color picker and a single-variant
+  one adds straight to cart; a
   search box that resolves an exact barcode/SKU scan directly to its variant on Enter;
   cart, discount/tax entry, one payment method per sale; the offline path (queued in
   IndexedDB — now caching variants alongside products — replayed automatically once

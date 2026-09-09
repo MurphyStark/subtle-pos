@@ -20,9 +20,8 @@ import { logActivity } from './activity.js';
 // barcode scanner behaves (types the code, then sends an Enter keystroke).
 
 let profile = null;
-let products = []; // [{ ...product fields, retail_price_cents, wholesale_price_cents, currency, variants: [...] }]
+let products = []; // [{ ...product fields, retail_price_cents, currency, variants: [...] }]
 let cart = []; // [{ product, variant, quantity }]
-let saleType = 'retail';
 let locationName = '';
 let balancesByVariant = {}; // variant_id -> quantity_available at the CURRENT location, display-only
 
@@ -82,7 +81,7 @@ async function loadProducts() {
       const client = getClient();
       const { data: prods, error: prodError } = await client
         .from('products')
-        .select('id, name, base_currency, min_wholesale_qty, is_active')
+        .select('id, name, base_currency, is_active')
         .eq('is_active', true);
       if (prodError) throw prodError;
 
@@ -109,7 +108,6 @@ async function loadProducts() {
       const enrichedProducts = prods.map((p) => ({
         ...p,
         retail_price_cents: latest[`${p.id}:retail`]?.unit_price_cents ?? null,
-        wholesale_price_cents: latest[`${p.id}:wholesale`]?.unit_price_cents ?? null,
         currency: latest[`${p.id}:retail`]?.currency ?? p.base_currency,
       }));
 
@@ -204,7 +202,7 @@ function discountCodeCents(subtotalCents) {
 }
 
 function currentPriceCents(product) {
-  return saleType === 'wholesale' ? product.wholesale_price_cents : product.retail_price_cents;
+  return product.retail_price_cents;
 }
 
 function variantLabel(variant) {
@@ -326,16 +324,6 @@ function setQuantity(variantId, quantity) {
 function renderCart() {
   const container = document.getElementById('cart-lines');
 
-  const belowMinimumLine =
-    saleType === 'wholesale' ? cart.find((l) => l.quantity < (l.product.min_wholesale_qty ?? 1)) : null;
-  const warningHtml = belowMinimumLine
-    ? `<p class="error">
-        ${belowMinimumLine.product.name} needs manager approval below its minimum wholesale
-        quantity of ${belowMinimumLine.product.min_wholesale_qty}. That approval flow isn't
-        built yet -- adjust the quantity or switch to Retail for now.
-      </p>`
-    : '';
-
   const linesHtml =
     cart
       .map((line) => {
@@ -357,7 +345,7 @@ function renderCart() {
       })
       .join('') || '<p style="color: var(--text-muted);">Cart is empty — tap a product to add it.</p>';
 
-  container.innerHTML = warningHtml + linesHtml;
+  container.innerHTML = linesHtml;
 
   container.querySelectorAll('.cart-line').forEach((el) => {
     const id = el.dataset.id;
@@ -381,9 +369,7 @@ function renderTotals() {
   document.getElementById('cart-total').textContent = formatCents(totalCents, currency);
   document.getElementById('manager-pin-row').hidden = manualDiscountCents <= manualDiscountCapCents;
 
-  const belowMinimum =
-    saleType === 'wholesale' && cart.some((l) => l.quantity < (l.product.min_wholesale_qty ?? 1));
-  document.getElementById('checkout-btn').disabled = cart.length === 0 || belowMinimum;
+  document.getElementById('checkout-btn').disabled = cart.length === 0;
 }
 
 function wireControls() {
@@ -402,18 +388,7 @@ function wireControls() {
   document.getElementById('cart-tax').addEventListener('input', renderTotals);
   document.getElementById('apply-discount-code-btn').addEventListener('click', handleApplyDiscountCode);
 
-  document.getElementById('type-retail').addEventListener('click', () => setSaleType('retail'));
-  document.getElementById('type-wholesale').addEventListener('click', () => setSaleType('wholesale'));
-
   document.getElementById('checkout-btn').addEventListener('click', completeSale);
-}
-
-function setSaleType(type) {
-  saleType = type;
-  document.getElementById('type-retail').classList.toggle('active', type === 'retail');
-  document.getElementById('type-wholesale').classList.toggle('active', type === 'wholesale');
-  renderProductGrid(document.getElementById('product-search').value);
-  renderCart();
 }
 
 // STEP 8: customer lookup/attach at checkout. Deliberately online-only -- unlike the sale
@@ -489,7 +464,7 @@ async function completeSale() {
     id: saleId,
     location_id: profile.primary_location_id,
     cashier_id: profile.id,
-    sale_type: saleType,
+    sale_type: 'retail', // checkout no longer offers a wholesale toggle -- wholesale PRICING (product_prices.price_type) is untouched, just not selectable at the till any more
     currency,
     subtotal_cents: subtotalCents,
     discount_cents: discountCents,
@@ -569,7 +544,7 @@ async function completeSale() {
   await logActivity(
     profile,
     'sale',
-    `${profile.full_name} completed a ${saleType} sale of ${formatCents(totalCents, currency)}`,
+    `${profile.full_name} completed a sale of ${formatCents(totalCents, currency)}`,
     { sale_id: saleId, total_cents: totalCents, currency, item_count: items.length }
   );
 
