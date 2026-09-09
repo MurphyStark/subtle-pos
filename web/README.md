@@ -129,14 +129,25 @@ individually. Current status:
 `js/config.js` currently still has its placeholder Supabase URL. Rather than that meaning
 nothing works, `js/supabaseClient.js` detects the placeholder and automatically swaps in
 `js/mockClient.js` — a stand-in that implements exactly the subset of the Supabase API this
-app calls (including `.storage.*` and the `verify_manager_pin` RPC), backed by realistic
-sample data (10 products, one stock location, four demo accounts — one per role, two of them
-pre-seeded with a manager PIN) persisted to `localStorage`. The login page
+app calls (including `.storage.*` and the `verify_manager_pin` RPC), backed by the **real
+Subtle Accessories product catalog** (`web/Catalog/Subtle Accessories Product Catalog.xlsx`
+— 17 products, 49 color/style variants, real names/SKUs/prices; brand colors are black and
+gold, reflected in `css/style.css`), one stock location, and four demo accounts — one per
+role, two of them pre-seeded with a manager PIN — persisted to `localStorage`. The login page
 shows one-click sign-in buttons for each role plus a "Reset demo data" button. Selling
 something in checkout visibly decrements stock on the Inventory page, adding a product in
 Admin (photo included — stored as a data URL in `localStorage` standing in for a real
 Storage bucket) shows up immediately, and completing a stock take reconciles the count —
 all the same as the real thing would.
+
+**Two fields the catalog itself flags as incomplete** ("fill in before syncing", per its own
+legend) are seeded as explicit placeholders, not estimates, per direct instruction: **cost
+price is seeded equal to retail price** (zero margin — every gross-profit figure on
+`reports.html` will read $0 until real costs are entered per product via `admin.html`'s
+price-edit row), and **stock quantity is seeded at 0** for every variant (every product is
+sellable — it has a price and a cost basis — but shows no stock until stock is actually
+received). Barcodes are also blank in the catalog and left unset (labels fall back to
+printing the SKU instead, same as any product with no barcode).
 
 **This is a real dependency, not a toy — it's what makes the deployed site demoable before
 a Supabase project exists.** Swap-out is automatic: once `js/config.js` has a real project

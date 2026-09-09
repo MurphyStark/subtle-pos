@@ -4,8 +4,9 @@
   --border: #e2e2e0;
   --text: #1c1c1a;
   --text-muted: #6b6b66;
-  --brand: #1f6f4d;
-  --brand-dark: #17563b;
+  --brand: #c9a227;
+  --brand-dark: #111111;
+  --brand-contrast: #171200;
   --danger: #b3441f;
   --warning: #a8710b;
   --radius: 8px;
@@ -88,12 +89,12 @@ input, select, button {
 
 button.primary {
   background: var(--brand);
-  color: white;
+  color: var(--brand-contrast);
   border: none;
   cursor: pointer;
   font-weight: 600;
 }
-button.primary:hover { background: var(--brand-dark); }
+button.primary:hover { background: var(--brand-dark); color: white; }
 button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
 button.ghost {
@@ -111,7 +112,7 @@ button.ghost {
 }
 .status-banner.offline { background: #fdecea; color: var(--danger); }
 .status-banner.pending { background: #fff4e5; color: var(--warning); }
-.status-banner.ok { background: #eaf5ee; color: var(--brand-dark); }
+.status-banner.ok { background: #faf1d7; color: var(--brand-dark); }
 
 /* --- login --- */
 .login-shell {
@@ -197,7 +198,7 @@ button.ghost {
 
 .sale-type-toggle { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
 .sale-type-toggle button { flex: 1; }
-.sale-type-toggle button.active { background: var(--brand); color: white; border-color: var(--brand); }
+.sale-type-toggle button.active { background: var(--brand); color: var(--brand-contrast); border-color: var(--brand); }
 
 .unauthorized { text-align: center; padding: 3rem 1rem; }
 
