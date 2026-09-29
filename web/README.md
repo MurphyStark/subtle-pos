@@ -61,6 +61,9 @@ individually. Current status:
   two locations — **removed** in the steps 9–11 batch when the second location was collapsed
   into one (see the top-level README's judgment-calls section); with only one location left,
   a transfer has no destination to move stock to.
+  **Restored (Sep 2026)** as an owner-only page for moving stock between the shop and the
+  new Warehouse location; a move goes straight to `received` since the owner is both
+  requester and approver.
 - ✅ **Step 6** (returns): `returns.html` searches past sales by receipt number, date range,
   or customer name/phone, then lets you select a returnable line, capture a reason (wrong
   size, defect, changed mind, other) and a refund method (cash, card, or store credit), and
