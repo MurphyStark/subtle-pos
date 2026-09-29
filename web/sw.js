@@ -5,7 +5,9 @@
 // .addAll() is all-or-nothing, so leaving stale entries here would make EVERY install fail
 // (a single 404 aborts the whole app-shell cache), silently breaking offline support
 // entirely. Added reports/activity, the newest pages.
-const CACHE_NAME = 'subtle-pos-shell-v6';
+// v7: transfers.html/js are back (owner-only Warehouse moves); mockClient.js has the full
+// catalog -- the bump also forces returning devices to drop the old cached product list.
+const CACHE_NAME = 'subtle-pos-shell-v7';
 const APP_SHELL = [
   './',
   './index.html',
@@ -18,6 +20,7 @@ const APP_SHELL = [
   './customers.html',
   './reports.html',
   './activity.html',
+  './transfers.html',
   './manifest.webmanifest',
   './css/style.css',
   './js/config.js',
@@ -44,6 +47,7 @@ const APP_SHELL = [
   './js/reports.js',
   './js/activity.js',
   './js/activity-page.js',
+  './js/transfers.js',
   './icons/favicon.png',
   './img/logo.png',
 ];

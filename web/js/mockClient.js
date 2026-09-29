@@ -16,13 +16,19 @@
 // v4: PRODUCT_SEED replaced with the real Subtle Accessories catalog -- bumped so anyone
 // with an existing demo session (still on the old placeholder products in localStorage)
 // gets reseeded automatically instead of staying stuck on stale sample data.
-const STATE_KEY = 'subtle-pos-demo-state-v4';
+// v5: full 107-variant catalog (WhatsApp + photos + price list) and the Warehouse location.
+const STATE_KEY = 'subtle-pos-demo-state-v5';
 const SESSION_KEY = 'subtle-pos-demo-session-v1';
 
-// Single location -- wholesale inventory (a separate stock location) was removed per
-// explicit direction; wholesale PRICING (retail vs wholesale price tiers, min_wholesale_qty)
-// is unaffected, see the remove_wholesale_location migration's header comment.
-export const DEMO_LOCATIONS = [{ id: 'loc-shop', name: 'Subtle Accessories Shop' }];
+// Two locations: the shop everyone sells from, and a Warehouse that only the OWNER can see
+// or touch -- mirrors the warehouse_location migration's locations_select policy and
+// restrictive can_access_location() policies. See canSeeRow() below.
+const SHOP_ID = 'loc-shop';
+const WAREHOUSE_ID = 'loc-warehouse';
+export const DEMO_LOCATIONS = [
+  { id: SHOP_ID, name: 'Subtle Accessories Shop', location_type: 'retail' },
+  { id: WAREHOUSE_ID, name: 'Warehouse', location_type: 'warehouse' },
+];
 
 const MANUAL_SUPPLIER_ID = 'supplier-manual';
 
@@ -42,201 +48,508 @@ export const DEMO_ACCOUNTS = [
 // without first visiting a settings screen. Real deployments start with manager_pin null.
 const DEMO_MANAGER_PINS = { 'user-owner': '1234', 'user-shop-manager': '5678' };
 
-// Sourced from the real Subtle Accessories product catalog
-// (web/Catalog/Subtle Accessories Product Catalog.xlsx), grouped by product name into one
-// product per name with one variant per color/SKU row from that sheet. Two fields the
-// catalog left blank (its own legend: "fill in before syncing"):
-//   - cost: seeded EQUAL to retail (zero margin) -- an explicit placeholder, not an
-//     estimate. Real gross-profit figures on reports.html will be wrong (always $0) until
-//     real cost prices are entered per product via admin.html's price-edit row.
-//   - qty: seeded at 0 for every variant, per explicit instruction -- every product exists
-//     and is sellable (it has a price and a cost basis), but shows no stock until stock is
-//     actually received (via admin.html's variant form, a purchase order, or a stock take).
-// Barcode and reorder_threshold were also blank in the catalog and are left null/unset.
+// GENERATED from "Subtle Accessories Stock Tracker.xlsx" (Products + Stock Levels sheets)
+// -- regenerate rather than hand-editing. One product per name (a name whose variants have
+// different prices is split, since price lives on the product); one variant per SKU row.
+// Products with no retail price yet are left out, since they can't be sold.
+//   - cost: taken from the tracker's Cost Price; where blank, seeded EQUAL to retail (zero
+//     margin) as an explicit placeholder -- gross profit on reports.html reads $0 until
+//     real costs are entered.
+//   - qty / warehouseQty: the tracker's Opening Store / Opening Warehouse counts.
+// Barcode and reorder_threshold are blank in the tracker and left null/unset.
 const PRODUCT_SEED = [
   {
-    name: "Owala SmoothSip® Slider 590Mls",
-    description: "For all your hot and cold beverages, 590mls. Leakproof.",
-    retail: 3000,
-    cost: 3000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
-    variants: [
-      { sku: "SUB-OWSS-BLU", color: "Blue", qty: 0 },
-      { sku: "SUB-OWSS-PWP", color: "Pearl White body & Blush Pink lid", qty: 0 },
-      { sku: "SUB-OWSS-GWP", color: "Gloss White with pastel stars", qty: 0 },
-      { sku: "SUB-OWSS-MWH", color: "Matte White", qty: 0 },
-      { sku: "SUB-OWSS-BLK", color: "Black", qty: 0 },
-      { sku: "SUB-OWSS-RPK", color: "Rose Pink", qty: 0 },
-    ],
-  },
-  {
-    name: "Stanley Quencher Tumbler",
+    name: "Chanel Quilted Flap Bag",
+    category: "Bags",
     description: null,
-    retail: 1500,
-    cost: 1500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    retail: 8500,
+    cost: 8500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
     variants: [
-      { sku: "SUB-STQ-MGR", color: "Marble Grey 1.18L", qty: 0 },
-      { sku: "SUB-STQ-CBL", color: "Cloudy Blue 1.18L", qty: 0 },
-      { sku: "SUB-STQ-HPK", color: "Hot Pink 1.18L", qty: 0 },
-      { sku: "SUB-STQ-LIL", color: "Lilac 1.18L", qty: 0 },
-      { sku: "SUB-STQ-MNU", color: "Marble Nude 1.18L", qty: 0 },
-      { sku: "SUB-STQ-MBL", color: "Marble Blue 1.18L", qty: 0 },
-      { sku: "SUB-STQ-BLK", color: "Black 1.18L", qty: 0 },
-      { sku: "SUB-STQ-NUD", color: "Nude 1.18L", qty: 0 },
-      { sku: "SUB-STQ-BPK", color: "Blush Pink 1.18L", qty: 0 },
-      { sku: "SUB-STQ-BHP", color: "Blush with Hot Pink handle 1.18L", qty: 0 },
+      { sku: "SUB-CHN-BLK", color: "Black, pearl top handle, chain strap", qty: 0, warehouseQty: 0 },
     ],
   },
   {
-    name: "Stanley FlowState™ Quencher H2.0 Tumbler",
-    description: "Double-wall vacuum-insulated stainless steel. Note: the \"Pink\" variant's colour was inferred from the product photo, not labeled in the original WhatsApp catalog text -- confirm before relying on it.",
-    retail: 1500,
-    cost: 1500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
-    variants: [
-      { sku: "SUB-SFS-LIL", color: "Lilac", qty: 0 },
-      { sku: "SUB-SFS-BLK", color: "Black 887ml leakproof", qty: 0 },
-      { sku: "SUB-SFS-PNK", color: "Pink", qty: 0 },
-    ],
-  },
-  {
-    name: "FlipStraw Stanley",
+    name: "Christian Dior Saddle Bag",
+    category: "Bags",
     description: null,
-    retail: 3000,
-    cost: 3000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    retail: 7500,
+    cost: 7500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
     variants: [
-      { sku: "SUB-FSS-BLU", color: "Blue Leakproof 1.18L", qty: 0 },
-      { sku: "SUB-FSS-BLK", color: "Black Leakproof 1.18L", qty: 0 },
-      { sku: "SUB-FSS-NUD", color: "Nude Leakproof 1.18L", qty: 0 },
-      { sku: "SUB-FSS-MPK", color: "Marble Pink Leakproof 1.18L", qty: 0 },
+      { sku: "SUB-DIO-BLK", color: "Black", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-DIO-WHT", color: "White", qty: 0, warehouseQty: 0 },
     ],
   },
   {
-    name: "Brūmate Era Tumbler 40oz",
-    description: "Hydration made stylish and effortless! 100% leakproof.",
-    retail: 4000,
-    cost: 4000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
-    variants: [
-      { sku: "SUB-BMT-SFG", color: "Seafoam Green 1.18ltrs", qty: 0 },
-      { sku: "SUB-BMT-NUD", color: "Nude 1.18ltrs", qty: 0 },
-      { sku: "SUB-BMT-BLK", color: "Black 1.18ltrs", qty: 0 },
-      { sku: "SUB-BMT-MBL", color: "Mist Blue 1.18ltrs", qty: 0 },
-    ],
-  },
-  {
-    name: "CAREKISO C124 Mechanical Watch",
-    description: "A bold timepiece combining luxury styling with fascinating mechanics.",
-    retail: 7000,
-    cost: 7000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
-    variants: [
-      { sku: "SUB-CRK-BKS", color: "Black Straps, Silver Frame", qty: 0 },
-      { sku: "SUB-CRK-BRN", color: "Brown Leather Straps", qty: 0 },
-      { sku: "SUB-CRK-BLU", color: "Blue Leather Straps", qty: 0 },
-      { sku: "SUB-CRK-ALB", color: "All Black", qty: 0 },
-    ],
-  },
-  {
-    name: "Men's Tevise Mechanical Watch",
-    description: "Men's luxury watch - wear it daily.",
-    retail: 4000,
-    cost: 4000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
-    variants: [
-      { sku: "SUB-TEV-BRG", color: "Brown Leather Straps, All Gold Frame", qty: 0 },
-      { sku: "SUB-TEV-BKS", color: "Black Leather Straps, Silver Frame", qty: 0 },
-      { sku: "SUB-TEV-ALB", color: "All Black, Leather Straps", qty: 0 },
-    ],
-  },
-  {
-    name: "Men's Binbond Mechanical Watch",
-    description: "Striking forged-carbon-inspired design.",
-    retail: 4000,
-    cost: 4000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
-    variants: [
-      { sku: "SUB-BIN-MRR", color: "Striped Maroon Frame, Red Rubber Straps", qty: 0 },
-      { sku: "SUB-BIN-CGR", color: "Striped Charcoal Grey Frame, Red Rubber Straps", qty: 0 },
-      { sku: "SUB-BIN-CGB", color: "Striped Charcoal Grey Frame, Black Rubber Straps", qty: 0 },
-      { sku: "SUB-BIN-MRB", color: "Striped Maroon Frame, Black Rubber Straps", qty: 0 },
-    ],
-  },
-  {
-    name: "Men's Vintage Mechanical Watch",
-    description: "Men's luxury watch - wear it daily, it powers itself.",
-    retail: 4000,
-    cost: 4000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
-    variants: [
-      { sku: "SUB-VIN-BLK", color: "Black Genuine Leather Straps", qty: 0 },
-      { sku: "SUB-VIN-BRN", color: "Brown Genuine Leather Straps", qty: 0 },
-    ],
-  },
-  {
-    name: "Men's Spinning Wheel Watch",
-    description: "Perfect for car enthusiasts - unique 360° spinning wheel dial.",
-    retail: 2500,
-    cost: 2500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
-    variants: [
-      { sku: "SUB-SPW-GRN", color: "Green Straps", qty: 0 },
-    ],
-  },
-  {
-    name: "Loewe Belt",
+    name: "D&G Logo Shoulder Bag",
+    category: "Bags",
     description: null,
-    retail: 2500,
-    cost: 2500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    retail: 7500,
+    cost: 7500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
     variants: [
-      { sku: "SUB-LOE-GLD", color: "Gold", qty: 0 },
-      { sku: "SUB-LOE-SLV", color: "Silver", qty: 0 },
+      { sku: "SUB-DGH-BLK", color: "Black patent", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-DGH-RED", color: "Red patent", qty: 0, warehouseQty: 0 },
     ],
   },
   {
-    name: "Gucci Belt",
+    name: "Gucci Half-Moon Bag",
+    category: "Bags",
+    description: null,
+    retail: 10000,
+    cost: 10000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-GUB-WHT", color: "White quilted", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Jacquemus Long Handbag",
+    category: "Bags",
     description: null,
     retail: 7000,
     cost: 7000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
     variants: [
-      { sku: "SUB-GUC-BLK", color: "Black, GG Buckle", qty: 0 },
+      { sku: "SUB-JAQ-BLK", color: "Black", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-JAQ-PNK", color: "Pink", qty: 0, warehouseQty: 0 },
     ],
   },
   {
-    name: "Gucci Belt (Silver)",
+    name: "Louis Vuitton Twist Bag",
+    category: "Bags",
     description: null,
-    retail: 2500,
-    cost: 2500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    retail: 9000,
+    cost: 9000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
     variants: [
-      { sku: "SUB-GUS-SLV", color: "Black strap, Silver GG Buckle", qty: 0 },
+      { sku: "SUB-LVB-BRN", color: "Brown", qty: 0, warehouseQty: 0 },
     ],
   },
   {
-    name: "YSL Belt",
+    name: "Louis Vuitton Twist Bag (Cream)",
+    category: "Bags",
     description: null,
-    retail: 2500,
-    cost: 2500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    retail: 11000,
+    cost: 11000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
     variants: [
-      { sku: "SUB-YSL-BLK", color: "Black", qty: 0 },
+      { sku: "SUB-LVB-CRM", color: "Cream", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Prada Patent Shoulder Bag",
+    category: "Bags",
+    description: null,
+    retail: 8500,
+    cost: 8500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-PRA-BLK", color: "Black", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "YSL Hobo Shoulder Bag",
+    category: "Bags",
+    description: null,
+    retail: 8500,
+    cost: 8500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-YSB-BLK", color: "Black", qty: 0, warehouseQty: 0 },
     ],
   },
   {
     name: "DG Belt",
+    category: "Belts",
     description: null,
     retail: 7000,
     cost: 7000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
     variants: [
-      { sku: "SUB-DGB-BLK", color: "Black with Gold Heart Buckle", qty: 0 },
+      { sku: "SUB-DGB-BLK", color: "Black with Gold Heart Buckle", qty: 0, warehouseQty: 0 },
     ],
   },
   {
     name: "Fendi Belt",
+    category: "Belts",
     description: null,
     retail: 3500,
     cost: 3500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
     variants: [
-      { sku: "SUB-FEN-TAN", color: "Tan/Brown", qty: 0 },
+      { sku: "SUB-FEN-TAN", color: "Tan/Brown", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Gucci Belt",
+    category: "Belts",
+    description: null,
+    retail: 7000,
+    cost: 7000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-GUC-BLK", color: "Black, GG Buckle", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Gucci Belt (Silver)",
+    category: "Belts",
+    description: null,
+    retail: 2500,
+    cost: 2500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-GUS-SLV", color: "Black strap, Silver GG Buckle", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Gucci Belt (Two-Tone)",
+    category: "Belts",
+    description: null,
+    retail: 7000,
+    cost: 7000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-GUT-BLK", color: "Black strap, silver/gold GG buckle", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Loewe Belt",
+    category: "Belts",
+    description: null,
+    retail: 2500,
+    cost: 2500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-LOE-GLD", color: "Gold", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-LOE-SLV", color: "Silver", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "YSL Belt",
+    category: "Belts",
+    description: null,
+    retail: 2500,
+    cost: 2500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-YSL-BLK", color: "Black", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-YSL-GLD", color: "Black, gold buckle", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Brūmate Era Tumbler 40oz",
+    category: "Drinkware",
+    description: "Hydration made stylish and effortless! 100% leakproof.",
+    retail: 4000,
+    cost: 4000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-BMT-BLK", color: "Black 1.18ltrs", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-BMT-MBL", color: "Mist Blue 1.18ltrs", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-BMT-NUD", color: "Nude 1.18ltrs", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-BMT-RTP", color: "Rose Taupe 1.18ltrs", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-BMT-SFG", color: "Seafoam Green 1.18ltrs", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "FlipStraw Stanley",
+    category: "Drinkware",
+    description: null,
+    retail: 3000,
+    cost: 3000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-FSS-BLK", color: "Black Leakproof 1.18L", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-FSS-BLU", color: "Blue Leakproof 1.18L", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-FSS-HPK", color: "Hot Pink Leakproof 1.18L", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-FSS-MPK", color: "Marble Pink Leakproof 1.18L", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-FSS-NUD", color: "Nude Leakproof 1.18L", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-FSS-WHT", color: "White Leakproof 1.18L", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "IceFlow Flip Straw 2.0 Tumbler 591ml",
+    category: "Drinkware",
+    description: null,
+    retail: 1500,
+    cost: 1500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-IFS-BLK", color: "Black", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-IFS-LIL", color: "Lilac", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-IFS-PNK", color: "Pink", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-IFS-RQZ", color: "Rose Quartz", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-IFS-TWL", color: "Twilight", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-IFS-WHT", color: "White", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Owala SmoothSip® Slider 590Mls",
+    category: "Drinkware",
+    description: "For all your hot and cold beverages, 590mls. Leakproof.",
+    retail: 3000,
+    cost: 3000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-OWSS-BLK", color: "Black", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-OWSS-BLU", color: "Blue", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-OWSS-GWP", color: "Gloss White with pastel stars", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-OWSS-MWH", color: "Matte White", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-OWSS-PWP", color: "Pearl White body & Blush Pink lid", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-OWSS-RPK", color: "Rose Pink", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Stanley FlowState™ Quencher H2.0 Tumbler",
+    category: "Drinkware",
+    description: "Double-wall vacuum-insulated stainless steel.",
+    retail: 1500,
+    cost: 1500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-SFS-BLK", color: "Black 887ml leakproof", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-SFS-LIL", color: "Lilac", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-SFS-PNK", color: "Pink", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Stanley Quencher Tumbler",
+    category: "Drinkware",
+    description: null,
+    retail: 1500,
+    cost: 1500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-STQ-BHP", color: "Blush with Hot Pink handle 1.18L", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-STQ-BLK", color: "Black 1.18L", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-STQ-BPK", color: "Blush Pink 1.18L", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-STQ-CBL", color: "Cloudy Blue 1.18L", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-STQ-HPK", color: "Hot Pink 1.18L", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-STQ-LIL", color: "Lilac 1.18L", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-STQ-MBL", color: "Marble Blue 1.18L", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-STQ-MGR", color: "Marble Grey 1.18L", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-STQ-MNU", color: "Marble Nude 1.18L", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-STQ-NUD", color: "Nude 1.18L", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Stanley x Tyla Tyger 40oz Tumbler",
+    category: "Drinkware",
+    description: null,
+    retail: 1500,
+    cost: 1500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-STT-TYG", color: "Tyger 1.18L", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "The Quencher H2.0 FlowState Tumbler 414ml",
+    category: "Drinkware",
+    description: null,
+    retail: 1500,
+    cost: 1500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-QFS-BLK", color: "Black", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-QFS-BLU", color: "Blue", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-QFS-BPK", color: "Blush Pink", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-QFS-HPK", color: "Hot Pink", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-QFS-NUD", color: "Nude", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Astronaut Galaxy Projector",
+    category: "Electronics",
+    description: null,
+    retail: 2000,
+    cost: 2000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-PRJ-AST", color: "White", qty: 0, warehouseQty: 0 },
     ],
   },
   {
     name: "Kids Instant Print Camera",
+    category: "Electronics",
     description: "8GB storage capacity. Prints photos on the spot. Rechargeable battery.",
     retail: 3000,
     cost: 3000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
     variants: [
-      { sku: "SUB-KID-STD", color: null, qty: 0 },
+      { sku: "SUB-KID-STD", color: "Standard", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Celine Bucket Hat",
+    category: "Hats",
+    description: null,
+    retail: 2000,
+    cost: 2000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-CEH-BLK", color: "Black denim", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-CEH-BLU", color: "Blue denim", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "LV Monogram Bucket Hat",
+    category: "Hats",
+    description: null,
+    retail: 2000,
+    cost: 2000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-LVH-DBL", color: "Dark blue denim, tan trim", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-LVH-LBL", color: "Light blue denim", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-LVH-OLV", color: "Olive green denim", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Loewe Sun Hat",
+    category: "Hats",
+    description: null,
+    retail: 2000,
+    cost: 2000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-LSH-TBC", color: "Colour TBC", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Prada Cap (Codro)",
+    category: "Hats",
+    description: null,
+    retail: 3000,
+    cost: 3000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-PRC-TBC", color: "Colour TBC", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Aokulasic Automatic Mechanical Watch",
+    category: "Watches",
+    description: null,
+    retail: 5000,
+    cost: 5000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-AOK-GBK", color: "Gold frame, Black Leather Straps", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-AOK-SBK", color: "Silver frame, Black Leather Straps", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-AOK-SBR", color: "Silver frame, Brown Leather Straps", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "CAREKISO C124 Mechanical Watch",
+    category: "Watches",
+    description: "A bold timepiece combining luxury styling with fascinating mechanics.",
+    retail: 7000,
+    cost: 7000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-CRK-ALB", color: "All Black", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-CRK-BKS", color: "Black Straps, Silver Frame", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-CRK-BLU", color: "Blue Leather Straps", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-CRK-BRN", color: "Brown Leather Straps", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Carekiso Double Tourbillon",
+    category: "Watches",
+    description: null,
+    retail: 8500,
+    cost: 8500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-CDT-ALB", color: "All Black Leather Straps", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-CDT-BRN", color: "Brown Leather Straps", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-CDT-SBK", color: "Silver Frame, Black Leather Straps", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Forsining Diamond Mechanical Watch",
+    category: "Watches",
+    description: null,
+    retail: 5000,
+    cost: 5000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-FDM-GLD", color: "Gold", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-FDM-SLV", color: "Silver/Gold (2nd 'Gold' listing - confirm)", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Forsining FG8 Automatic",
+    category: "Watches",
+    description: null,
+    retail: 5000,
+    cost: 5000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-FG8-GLD", color: "Gold", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-FG8-SLV", color: "Silver", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Forsining Mechanical Watch",
+    category: "Watches",
+    description: null,
+    retail: 6000,
+    cost: 6000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-FOR-BLK", color: "Black - Stainless Steel Straps", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-FOR-GLD", color: "Gold - Stainless Steel Straps", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-FOR-SLV", color: "Silver - Stainless Steel Straps", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Mark Fairwhale FW-625 Dual Tourbillon Automatic",
+    category: "Watches",
+    description: null,
+    retail: 9500,
+    cost: 9500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-MFT-BLK", color: "Black", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-MFT-WHT", color: "White", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Mark Fairwhale FW6",
+    category: "Watches",
+    description: null,
+    retail: 8000,
+    cost: 8000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-MF6-BLK", color: "Black - Stainless Steel", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-MF6-SLV", color: "Silver - Stainless Steel", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Men's Binbond Mechanical Watch",
+    category: "Watches",
+    description: "Striking forged-carbon-inspired design.",
+    retail: 4000,
+    cost: 4000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-BIN-CGB", color: "Striped Charcoal Grey Frame, Black Rubber Straps", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-BIN-CGR", color: "Striped Charcoal Grey Frame, Red Rubber Straps", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-BIN-MRB", color: "Striped Maroon Frame, Black Rubber Straps", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-BIN-MRR", color: "Striped Maroon Frame, Red Rubber Straps", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Men's Spinning Wheel Watch",
+    category: "Watches",
+    description: "Perfect for car enthusiasts - unique 360° spinning wheel dial.",
+    retail: 2500,
+    cost: 2500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-SPW-GRN", color: "Green Straps", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-SPW-RED", color: "Red Straps", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Men's Tevise Mechanical Watch",
+    category: "Watches",
+    description: "Men's luxury watch - wear it daily.",
+    retail: 4000,
+    cost: 4000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-TEV-ALB", color: "All Black, Leather Straps", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-TEV-BKS", color: "Black Leather Straps, Silver Frame", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-TEV-BRG", color: "Brown Leather Straps, All Gold Frame", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "Men's Vintage Mechanical Watch",
+    category: "Watches",
+    description: "Men's luxury watch - wear it daily, it powers itself.",
+    retail: 4000,
+    cost: 4000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-VIN-BLK", color: "Black Genuine Leather Straps", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-VIN-BRN", color: "Brown Genuine Leather Straps", qty: 0, warehouseQty: 0 },
+    ],
+  },
+  {
+    name: "SKMEI Spinning Wheel Watch",
+    category: "Watches",
+    description: null,
+    retail: 3500,
+    cost: 3500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    variants: [
+      { sku: "SUB-SKM-SCP", color: "Scorpion", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-SKM-SPD", color: "Spider", qty: 0, warehouseQty: 0 },
+      { sku: "SUB-SKM-SPT", color: "Sporty", qty: 0, warehouseQty: 0 },
     ],
   },
 ];
@@ -294,17 +607,19 @@ function buildSeed() {
         is_active: true,
         reorder_threshold: v.reorderThreshold ?? null,
       });
-      balances.push({
-        id: `bal-${variantId}-loc-shop`,
-        variant_id: variantId,
-        location_id: 'loc-shop',
-        quantity_available: v.qty ?? 0,
-        average_unit_cost_cents: p.cost,
-        currency: 'USD',
-        needs_review: false,
-        needs_review_reason: null,
-        updated_at: new Date().toISOString(),
-      });
+      for (const [locationId, qty] of [[SHOP_ID, v.qty], [WAREHOUSE_ID, v.warehouseQty]]) {
+        balances.push({
+          id: `bal-${variantId}-${locationId}`,
+          variant_id: variantId,
+          location_id: locationId,
+          quantity_available: qty ?? 0,
+          average_unit_cost_cents: p.cost,
+          currency: 'USD',
+          needs_review: false,
+          needs_review_reason: null,
+          updated_at: new Date().toISOString(),
+        });
+      }
     });
   });
 
@@ -396,6 +711,34 @@ function loadSession() {
 function saveSession(user) {
   if (user) localStorage.setItem(SESSION_KEY, JSON.stringify(user));
   else localStorage.removeItem(SESSION_KEY);
+}
+
+// Mirrors the warehouse_location migration: anyone but the owner sees (and can write) nothing
+// that lives at the Warehouse -- not the location itself, its balances, or any count,
+// receipt, purchase order, sale or transfer touching it.
+function canSeeRow(table, row) {
+  if (loadSession()?.role === 'owner') return true;
+  switch (table) {
+    case 'locations':
+      return row.id !== WAREHOUSE_ID;
+    case 'v_inventory_balances':
+    case 'stock_counts':
+    case 'stock_receipts':
+    case 'purchase_orders':
+    case 'sales':
+      return row.location_id !== WAREHOUSE_ID;
+    case 'sale_item_returns':
+    case 'v_sale_item_returns':
+      return row.restock_location_id !== WAREHOUSE_ID;
+    case 'inventory_transfers':
+      return row.from_location_id !== WAREHOUSE_ID && row.to_location_id !== WAREHOUSE_ID;
+    case 'inventory_transfer_items': {
+      const transfer = state.inventory_transfers.find((t) => t.id === row.inventory_transfer_id);
+      return !transfer || canSeeRow('inventory_transfers', transfer);
+    }
+    default:
+      return true;
+  }
 }
 
 function tableRows(table) {
@@ -631,6 +974,7 @@ function applyWrite(table, rows) {
         else target.push(row);
         continue;
       }
+      if (!canSeeRow(table, row)) throw new Error('new row violates row-level security policy (Warehouse is owner-only)');
       if (target.find((r) => r.id === row.id)) continue; // upsert + ignoreDuplicates semantics
       if (table === 'sale_item_returns') processSaleItemReturn(row); // may throw; mutates row
       target.push(row);
@@ -648,7 +992,7 @@ function applyWrite(table, rows) {
 
 function applyUpdate(table, patch, filters) {
   const target = tableRows(table);
-  const matches = target.filter((r) => filters.every((f) => f(r)));
+  const matches = target.filter((r) => canSeeRow(table, r) && filters.every((f) => f(r)));
   for (const row of matches) {
     const wasCompleted = row.status === 'completed';
     const wasReceived = row.status === 'received' || row.status === 'partially_received';
@@ -715,7 +1059,7 @@ class MockQuery {
     if (this._write) return applyWrite(this._table, this._write);
     if (this._updatePatch) return applyUpdate(this._table, this._updatePatch, this._filters);
 
-    let rows = tableRows(this._table).filter((r) => this._filters.every((f) => f(r)));
+    let rows = tableRows(this._table).filter((r) => canSeeRow(this._table, r) && this._filters.every((f) => f(r)));
     if (this._orderCol) {
       const col = this._orderCol;
       rows = rows.slice().sort((a, b) => {

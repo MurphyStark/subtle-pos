@@ -25,6 +25,7 @@ export function renderNav(profile) {
       <a href="returns.html">Returns</a>
       <a href="customers.html">Customers</a>
       ${isManager ? '<a href="inventory.html">Inventory</a><a href="admin.html">Admin</a><a href="purchase-orders.html">Purchase Orders</a><a href="reports.html">Reports</a><a href="activity.html">Activity</a>' : ''}
+      ${profile.role === 'owner' ? '<a href="transfers.html">Transfers</a>' : ''}
     </div>
     <div class="nav-user">
       <span>${profile.full_name} · ${profile.role.replace('_', ' ')}</span>
