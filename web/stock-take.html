@@ -8,20 +8,25 @@
   <link rel="icon" type="image/png" href="icons/favicon.png" />
   <link rel="apple-touch-icon" href="icons/favicon.png" />
   <meta name="theme-color" content="#111111" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <nav id="app-nav"></nav>
 
   <main>
-    <h1>Stock take</h1>
-    <p style="color: var(--text-muted); margin-top: -0.5rem;">
-      Count what's actually on the shelf. Whatever you enter here becomes the new system
-      quantity for that product at this location the moment you complete the count.
-    </p>
+    <header class="page-header">
+      <div>
+        <h1>Stock Take</h1>
+        <p class="page-subtitle">Count and reconcile your physical stock with system records.</p>
+      </div>
+    </header>
+    <div class="callout info" style="margin-bottom: 16px;">Count what's actually on the shelf. Whatever you enter here becomes the new system quantity for that product at this location the moment you complete the count.</div>
 
-    <div class="card" style="margin-bottom: 1rem;">
-      <label style="display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.85rem; color: var(--text-muted); max-width: 320px;">
+    <div class="card" style="margin-bottom: 16px;">
+      <label class="field" style="max-width: 320px;">
         Location
         <select id="location-select"></select>
       </label>
@@ -33,7 +38,7 @@
       <div id="stock-take-body">Loading…</div>
     </div>
 
-    <button type="button" id="complete-btn" class="primary" style="margin-top: 1rem;" disabled>
+    <button type="button" id="complete-btn" class="primary lg" style="margin-top: 16px;" disabled>
       Complete stock take
     </button>
     <p class="error" id="stock-take-error"></p>

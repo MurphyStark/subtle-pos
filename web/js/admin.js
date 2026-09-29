@@ -6,6 +6,8 @@ import { registerServiceWorker } from './pwa.js';
 import { resizeImage } from './image.js';
 import { printLabels } from './labels.js';
 import { logActivity } from './activity.js';
+import { icon } from './icons.js';
+import { thumb, stockStatus, stockPill, renderPagination } from './ui.js';
 
 // Manager/owner only -- RLS enforces this independently (products/product_variants/
 // product_prices writes all require is_manager_or_owner(), and product_cost_history is
@@ -19,6 +21,10 @@ import { logActivity } from './activity.js';
 let profile = null;
 let locations = [];
 let expandedProductId = null;
+let categories = [];
+// Products-table view state: search, filters and page survive re-renders after an edit.
+const view = { term: '', category: '', status: '', page: 1 };
+let catalog = null; // last fetched { products, variants, latestPrice, balancesByVariant }
 
 async function init() {
   registerServiceWorker();
@@ -29,8 +35,17 @@ async function init() {
   renderNav(profile);
 
   const client = getClient();
-  const { data: locs } = await client.from('locations').select('id, name');
+  const [{ data: locs }, { data: cats }] = await Promise.all([
+    client.from('locations').select('id, name'),
+    client.from('categories').select('id, name').order('name'),
+  ]);
   locations = locs ?? [];
+  categories = cats ?? [];
+
+  const categoryOptions = categories.map((c) => `<option value="${c.id}">${c.name}</option>`).join('');
+  document.getElementById('filter-category').innerHTML = `<option value="">All categories</option>${categoryOptions}`;
+  document.querySelector('#product-form select[name="category_id"]').innerHTML = `<option value="">No category</option>${categoryOptions}`;
+  wireProductToolbar();
 
   document.querySelector('input[name="photo"]').addEventListener('change', previewPhoto);
   document.getElementById('product-form').addEventListener('submit', handleCreateProduct);
@@ -95,6 +110,7 @@ async function handleCreateProduct(event) {
       id: productId,
       name: form.name.value.trim(),
       description: form.description.value.trim() || null,
+      category_id: form.category_id.value || null,
       base_currency: currency,
       min_wholesale_qty: Number(form.min_wholesale_qty.value) || 1,
       is_active: true,
@@ -138,7 +154,11 @@ async function handleCreateProduct(event) {
     form.reset();
     document.getElementById('photo-preview').innerHTML = '';
     expandedProductId = productId;
+    view.term = '';
+    view.page = 1;
+    document.getElementById('product-search').value = '';
     await renderProductList();
+    document.querySelector('.expanded-row')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   } catch (err) {
     errorEl.textContent = err.message ?? String(err);
   } finally {
@@ -268,6 +288,33 @@ function renderVariantAddForm(product) {
   `;
 }
 
+function wireProductToolbar() {
+  const search = document.getElementById('product-search');
+  search.addEventListener('input', () => {
+    view.term = search.value.trim().toLowerCase();
+    view.page = 1;
+    drawProductTable();
+  });
+  document.getElementById('filter-category').addEventListener('change', (e) => {
+    view.category = e.target.value;
+    view.page = 1;
+    drawProductTable();
+  });
+  document.getElementById('filter-status').addEventListener('change', (e) => {
+    view.status = e.target.value;
+    view.page = 1;
+    drawProductTable();
+  });
+  const addPanel = document.getElementById('add-product-panel');
+  document.getElementById('toggle-add-product').addEventListener('click', () => {
+    addPanel.hidden = !addPanel.hidden;
+    if (!addPanel.hidden) addPanel.querySelector('input[name="name"]').focus();
+  });
+  document.getElementById('cancel-add-product').addEventListener('click', () => {
+    addPanel.hidden = true;
+  });
+}
+
 async function renderProductList() {
   const client = getClient();
   const [{ data: products }, { data: variants }, { data: prices }, { data: balances }] = await Promise.all([
@@ -293,24 +340,69 @@ async function renderProductList() {
     (balancesByVariant[b.variant_id] ??= []).push(b);
   }
 
-  const locationName = Object.fromEntries(locations.map((l) => [l.id, l.name]));
-
-  const container = document.getElementById('product-list');
-  container.innerHTML =
-    (products ?? [])
+  const categoryName = Object.fromEntries(categories.map((c) => [c.id, c.name]));
+  catalog = {
+    products: (products ?? [])
       .map((p) => {
-        const retail = latestPrice[`${p.id}:retail`];
-        const wholesale = latestPrice[`${p.id}:wholesale`];
-        const currency = retail?.currency ?? p.base_currency;
         const productVariants = variantsByProduct[p.id] ?? [];
         const totalStock = productVariants.reduce(
           (sum, v) => sum + (balancesByVariant[v.id] ?? []).reduce((s, b) => s + b.quantity_available, 0),
           0
         );
+        return {
+          ...p,
+          variants: productVariants,
+          categoryName: categoryName[p.category_id] ?? '',
+          totalStock,
+          status: productVariants.length ? stockStatus(totalStock) : 'out',
+        };
+      })
+      .sort((a, b) => a.categoryName.localeCompare(b.categoryName) || a.name.localeCompare(b.name)),
+    variants: variants ?? [],
+    latestPrice,
+    balancesByVariant,
+  };
+  drawProductTable();
+}
+
+function drawProductTable() {
+  const { latestPrice, balancesByVariant } = catalog;
+  const locationName = Object.fromEntries(locations.map((l) => [l.id, l.name]));
+
+  const filtered = catalog.products.filter((p) => {
+    if (view.category && p.category_id !== view.category) return false;
+    if (view.status && p.status !== view.status) return false;
+    if (!view.term) return true;
+    return p.name.toLowerCase().includes(view.term) || p.variants.some((v) => (v.sku ?? '').toLowerCase().includes(view.term) || (v.barcode ?? '') === view.term);
+  });
+  // An expanded product stays on screen: jump to its page.
+  const expandedIndex = filtered.findIndex((p) => p.id === expandedProductId);
+  if (expandedIndex >= 0) view.page = Math.floor(expandedIndex / 10) + 1;
+
+  const { from, to, page } = renderPagination(document.getElementById('product-pagination'), {
+    total: filtered.length,
+    page: view.page,
+    noun: 'products',
+    onPage: (n) => {
+      view.page = n;
+      expandedProductId = null;
+      drawProductTable();
+    },
+  });
+  view.page = page;
+
+  const tbody = document.getElementById('product-list');
+  tbody.innerHTML =
+    filtered
+      .slice(from, to)
+      .map((p) => {
+        const retail = latestPrice[`${p.id}:retail`];
+        const wholesale = latestPrice[`${p.id}:wholesale`];
+        const currency = retail?.currency ?? p.base_currency;
         const expanded = expandedProductId === p.id;
 
         const variantRows =
-          productVariants
+          p.variants
             .map((v) => {
               const stockByLoc = (balancesByVariant[v.id] ?? [])
                 .map((b) => `${locationName[b.location_id] ?? '?'}: ${b.quantity_available}`)
@@ -323,46 +415,57 @@ async function renderProductList() {
                 <td>${v.barcode ?? '—'}</td>
                 <td>${stockByLoc || '0'}</td>
                 <td>${v.reorder_threshold ?? '—'}</td>
-                <td><button type="button" class="ghost print-label-btn" data-product-id="${p.id}" data-variant-id="${v.id}">Print label</button></td>
+                <td><button type="button" class="ghost print-label-btn" data-product-id="${p.id}" data-variant-id="${v.id}">${icon('printer', { size: 16 })} Label</button></td>
               </tr>`;
             })
-            .join('') || '<tr><td colspan="7" style="color: var(--text-muted);">No variants yet — this product cannot be sold until one exists.</td></tr>';
+            .join('') || '<tr><td colspan="7" class="muted">No variants yet — this product cannot be sold until one exists.</td></tr>';
 
         return `
-        <div class="card product-card">
-          <div class="product-card-header" data-id="${p.id}">
-            ${p.image_url ? `<img class="product-thumb" src="${p.image_url}" alt="${p.name}" />` : ''}
-            <span class="name">${p.name}</span>
-            <span class="meta">${retail ? formatCents(retail.unit_price_cents, currency) : '—'}${wholesale ? ` / ${formatCents(wholesale.unit_price_cents, currency)} wholesale` : ''}</span>
-            <span class="meta">${totalStock} in stock</span>
-            <span class="meta">${productVariants.length} variant${productVariants.length === 1 ? '' : 's'}</span>
-          </div>
-          <div class="product-card-body" ${expanded ? '' : 'hidden'}>
-            ${p.description ? `<p style="color: var(--text-muted); font-size: 0.9rem;">${p.description}</p>` : ''}
+        <tr class="product-row" data-id="${p.id}">
+          <td><div class="cell-product">${thumb(p.image_url, '', 'md')}<span class="name">${p.name}</span></div></td>
+          <td class="muted">${p.categoryName || '—'}</td>
+          <td>${p.variants.length}</td>
+          <td class="muted nowrap">${p.variants[0]?.sku ?? '—'}</td>
+          <td class="num">${retail ? formatCents(retail.unit_price_cents, currency) : '—'}</td>
+          <td class="num">${p.totalStock}</td>
+          <td>${stockPill(p.status)}</td>
+          <td><div class="row-actions">
+            <button type="button" class="icon-btn edit-product-btn" aria-expanded="${expanded}" aria-label="Edit ${p.name}" title="Edit">${icon('pencil', { size: 16 })}</button>
+          </div></td>
+        </tr>
+        ${
+          expanded
+            ? `<tr class="expanded-row"><td colspan="8">
+            ${p.description ? `<p class="muted" style="margin-top: 0;">${p.description}</p>` : ''}
             <div class="price-edit-row">
               Retail <input type="number" min="0" step="0.01" class="edit-retail" value="${retail ? (retail.unit_price_cents / 100).toFixed(2) : ''}" />
               Wholesale <input type="number" min="0" step="0.01" class="edit-wholesale" value="${wholesale ? (wholesale.unit_price_cents / 100).toFixed(2) : ''}" />
               <button type="button" class="ghost save-price-btn" data-id="${p.id}" data-currency="${currency}">Update price</button>
             </div>
-            <table class="variant-table">
-              <thead><tr><th>Size</th><th>Color</th><th>SKU</th><th>Barcode</th><th>Stock by location</th><th>Reorder at</th><th></th></tr></thead>
+            <div class="table-wrap"><table class="variant-table">
+              <thead><tr><th>Size</th><th>Colour</th><th>SKU</th><th>Barcode</th><th>Stock by location</th><th>Reorder at</th><th></th></tr></thead>
               <tbody>${variantRows}</tbody>
-            </table>
-            ${productVariants.length > 0 ? `<button type="button" class="ghost print-all-labels-btn" data-id="${p.id}">Print all labels for this product</button>` : ''}
-            <h2 style="font-size: 0.95rem; margin-top: 1rem;">Add a variant</h2>
+            </table></div>
+            ${p.variants.length > 0 ? `<button type="button" class="ghost print-all-labels-btn" data-id="${p.id}">${icon('printer', { size: 16 })} Print all labels for this product</button>` : ''}
+            <h2 style="font-size: 15px; margin-top: 18px;">Add a variant</h2>
             ${renderVariantAddForm(p)}
-          </div>
-        </div>`;
+          </td></tr>`
+            : ''
+        }`;
       })
-      .join('') || '<p style="color: var(--text-muted);">No products yet — add one above.</p>';
+      .join('') || '<tr><td colspan="8" class="muted" style="text-align: center; padding: 32px;">No products match these filters.</td></tr>';
 
-  container.querySelectorAll('.product-card-header').forEach((header) => {
-    header.addEventListener('click', () => {
-      expandedProductId = expandedProductId === header.dataset.id ? null : header.dataset.id;
-      renderProductList();
+  const products = catalog.products;
+  const variants = catalog.variants;
+  const variantsByProduct = Object.fromEntries(products.map((p) => [p.id, p.variants]));
+
+  tbody.querySelectorAll('.product-row').forEach((row) => {
+    row.addEventListener('click', () => {
+      expandedProductId = expandedProductId === row.dataset.id ? null : row.dataset.id;
+      drawProductTable();
     });
   });
-  container.querySelectorAll('.save-price-btn').forEach((btn) => {
+  tbody.querySelectorAll('.save-price-btn').forEach((btn) => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const row = btn.closest('.price-edit-row');
@@ -372,19 +475,19 @@ async function renderProductList() {
       if (wholesaleVal) await updatePrice(btn.dataset.id, 'wholesale', btn.dataset.currency, wholesaleVal);
     });
   });
-  container.querySelectorAll('.print-label-btn').forEach((btn) => {
+  tbody.querySelectorAll('.print-label-btn').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const product = (products ?? []).find((p) => p.id === btn.dataset.productId);
-      const variant = (variants ?? []).find((v) => v.id === btn.dataset.variantId);
+      const product = products.find((p) => p.id === btn.dataset.productId);
+      const variant = variants.find((v) => v.id === btn.dataset.variantId);
       const retail = latestPrice[`${product.id}:retail`];
       printLabels([buildLabelItem(product, variant, retail, retail?.currency ?? product.base_currency)]);
     });
   });
-  container.querySelectorAll('.print-all-labels-btn').forEach((btn) => {
+  tbody.querySelectorAll('.print-all-labels-btn').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const product = (products ?? []).find((p) => p.id === btn.dataset.id);
+      const product = products.find((p) => p.id === btn.dataset.id);
       const retail = latestPrice[`${product.id}:retail`];
       const items = (variantsByProduct[product.id] ?? []).map((v) =>
         buildLabelItem(product, v, retail, retail?.currency ?? product.base_currency)
@@ -392,8 +495,8 @@ async function renderProductList() {
       printLabels(items);
     });
   });
-  container.querySelectorAll('.add-variant-form-target').forEach((form) => {
-    const product = (products ?? []).find((p) => p.id === form.dataset.productId);
+  tbody.querySelectorAll('.add-variant-form-target').forEach((form) => {
+    const product = products.find((p) => p.id === form.dataset.productId);
     // Prefill the SKU with a reasonable suggestion as size/color are typed, without
     // fighting a manual edit -- only auto-fill while the field is still untouched.
     let skuTouched = false;

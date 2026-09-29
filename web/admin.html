@@ -8,21 +8,33 @@
   <link rel="icon" type="image/png" href="icons/favicon.png" />
   <link rel="apple-touch-icon" href="icons/favicon.png" />
   <meta name="theme-color" content="#111111" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <nav id="app-nav"></nav>
 
   <main>
-    <h1>Add a product</h1>
-    <p style="color: var(--text-muted); margin-top: -0.5rem;">
-      Create the product itself first (name, price, cost, photo) — then add its size/color
-      variants below. A product isn't sellable until it has at least one variant.
-    </p>
-    <div class="card">
+    <header class="page-header">
+      <div>
+        <h1>Products</h1>
+        <p class="page-subtitle">Manage your product catalogue, variants, pricing and stock levels.</p>
+      </div>
+    </header>
+
+    <section class="card" id="add-product-panel" hidden style="margin-bottom: 16px;">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Add a product</h2>
+          <p class="card-subtitle">Create the product first (name, price, cost, photo), then add its colour/size variants from its row below. A product isn't sellable until it has at least one variant.</p>
+        </div>
+      </div>
       <form id="product-form" class="admin-form">
         <div class="form-grid">
           <label>Name <input type="text" name="name" required /></label>
+          <label>Category <select name="category_id"></select></label>
           <label>Currency
             <select name="currency">
               <option value="USD">USD</option>
@@ -30,25 +42,51 @@
               <option value="ZAR">ZAR</option>
             </select>
           </label>
-          <label>Retail price <input type="number" name="retail_price" min="0" step="0.01" required /></label>
-          <label>Wholesale price <input type="number" name="wholesale_price" min="0" step="0.01" /></label>
+          <label>Retail price <input type="number" name="retail_price" min="0" step="0.01" required placeholder="e.g. 30.00" /></label>
+          <label>Wholesale price (optional) <input type="number" name="wholesale_price" min="0" step="0.01" placeholder="e.g. 20.00" /></label>
           <label>Min. wholesale qty <input type="number" name="min_wholesale_qty" min="1" step="1" value="6" /></label>
-          <label>Cost price (per unit) <input type="number" name="cost_price" min="0" step="0.01" required /></label>
+          <label>Cost price (per unit) <input type="number" name="cost_price" min="0" step="0.01" required placeholder="e.g. 10.00" /></label>
         </div>
-        <label>Description <textarea name="description" rows="2" style="width: 100%; font: inherit; padding: 0.55rem 0.7rem; border-radius: 8px; border: 1px solid var(--border);"></textarea></label>
-        <label>Photo <input type="file" name="photo" accept="image/*" /></label>
+        <label>Description (optional) <textarea name="description" rows="3"></textarea></label>
+        <label>Product image <input type="file" name="photo" accept="image/*" /></label>
         <div id="photo-preview"></div>
-        <button type="submit" class="primary">Add product</button>
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button type="button" class="ghost" id="cancel-add-product">Cancel</button>
+          <button type="submit" class="primary">Add product</button>
+        </div>
         <p class="error" id="product-error"></p>
-        <p id="product-success" style="color: var(--brand-dark); font-size: 0.9rem;"></p>
+        <p class="success" id="product-success"></p>
       </form>
-    </div>
+    </section>
 
-    <h1 style="margin-top: 1.5rem;">Products &amp; variants</h1>
-    <div id="product-list"></div>
+    <section class="card">
+      <div class="toolbar">
+        <label class="search">
+          <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="search" id="product-search" placeholder="Search products, SKU or barcode…" aria-label="Search products" />
+        </label>
+        <select id="filter-category" aria-label="Category"></select>
+        <select id="filter-status" aria-label="Stock status">
+          <option value="">All stock status</option>
+          <option value="in">In stock</option>
+          <option value="low">Low stock</option>
+          <option value="out">Out of stock</option>
+        </select>
+        <button type="button" class="primary" id="toggle-add-product" style="height: 46px;"><svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Add product</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Product</th><th>Category</th><th>Variants</th><th>SKU (example)</th><th class="num">Price</th><th class="num">Stock</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody id="product-list"><tr><td colspan="8" class="muted">Loading…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="product-pagination"></div>
+    </section>
 
-    <h1 style="margin-top: 1.5rem;">Discount codes</h1>
-    <div class="card">
+    <h2 class="section-title">Discount codes</h2>
+    <section class="card">
       <form id="discount-code-form" class="admin-form">
         <div class="form-grid">
           <label>Code <input type="text" name="code" required placeholder="e.g. SUMMER20" style="text-transform: uppercase;" /></label>
@@ -62,28 +100,27 @@
           <label>Min. spend <input type="number" name="min_spend" min="0" step="0.01" placeholder="0" /></label>
           <label>Valid until <input type="date" name="valid_until" /></label>
         </div>
-        <button type="submit" class="primary">Add discount code</button>
+        <div><button type="submit" class="primary">Add discount code</button></div>
         <p class="error" id="discount-code-error"></p>
       </form>
-      <table style="margin-top: 1rem;">
-        <thead><tr><th>Code</th><th>Type</th><th>Value</th><th>Min. spend</th><th>Valid until</th><th>Active</th><th></th></tr></thead>
-        <tbody id="discount-code-list-body"><tr><td colspan="7">Loading…</td></tr></tbody>
-      </table>
-    </div>
+      <div class="table-wrap" style="margin-top: 12px;">
+        <table>
+          <thead><tr><th>Code</th><th>Type</th><th>Value</th><th>Min. spend</th><th>Valid until</th><th>Active</th><th></th></tr></thead>
+          <tbody id="discount-code-list-body"><tr><td colspan="7">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
 
-    <h1 style="margin-top: 1.5rem;">My manager PIN</h1>
-    <p style="color: var(--text-muted); margin-top: -0.5rem;">
-      A short PIN a cashier can ask you to enter at checkout to approve a manual discount
-      above the store's cap — quicker than logging you in on their device.
-    </p>
-    <div class="card">
-      <form id="pin-form" class="admin-form" style="max-width: 280px;">
+    <h2 class="section-title">My manager PIN</h2>
+    <section class="card">
+      <p class="card-subtitle" style="margin: 0 0 14px;">A short PIN a cashier can ask you to enter at checkout to approve a manual discount above the store's cap. It's quicker than logging you in on their device.</p>
+      <form id="pin-form" class="admin-form" style="max-width: 320px;">
         <label>New PIN (4–6 digits) <input type="text" name="pin" inputmode="numeric" pattern="[0-9]{4,6}" placeholder="e.g. 4821" /></label>
-        <button type="submit" class="primary">Save PIN</button>
+        <div><button type="submit" class="primary">Save PIN</button></div>
         <p class="error" id="pin-error"></p>
-        <p id="pin-success" style="color: var(--brand-dark); font-size: 0.9rem;"></p>
+        <p class="success" id="pin-success"></p>
       </form>
-    </div>
+    </section>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

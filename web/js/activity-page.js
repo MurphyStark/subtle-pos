@@ -1,6 +1,7 @@
 import { requireAuth } from './auth.js';
 import { getClient } from './supabaseClient.js';
-import { renderNav } from './nav.js';
+import { renderNav, roleLabel, initials } from './nav.js';
+import { pill } from './ui.js';
 import { registerServiceWorker } from './pwa.js';
 import { isOnlineNow } from './activity.js';
 
@@ -67,9 +68,9 @@ function renderPresence() {
             const online = isOnlineNow(u.last_seen_at);
             return `
           <tr>
-            <td>${u.full_name}</td>
-            <td>${u.role.replace('_', ' ')}</td>
-            <td>${online ? '🟢 Online' : '⚪ Offline'}</td>
+            <td><div class="cell-product"><span class="avatar" style="width: 32px; height: 32px; font-size: 12px;">${initials(u.full_name)}</span><span class="name">${u.full_name}</span></div></td>
+            <td>${roleLabel(u.role)}</td>
+            <td>${online ? pill('success', 'Online') : pill('neutral', 'Offline')}</td>
             <td>${u.last_seen_at ? new Date(u.last_seen_at).toLocaleString() : 'Never'}</td>
           </tr>`;
           })

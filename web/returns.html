@@ -8,23 +8,32 @@
   <link rel="icon" type="image/png" href="icons/favicon.png" />
   <link rel="apple-touch-icon" href="icons/favicon.png" />
   <meta name="theme-color" content="#111111" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <nav id="app-nav"></nav>
 
   <main>
+    <header class="page-header">
+      <div>
+        <h1>Returns</h1>
+        <p class="page-subtitle">Find a past sale and process a return or refund.</p>
+      </div>
+    </header>
     <div id="status-banner"></div>
-    <h1>Find a sale to return</h1>
-    <div class="card">
+    <section class="card">
+      <div class="card-header"><h2 class="card-title">Find a sale to return</h2></div>
       <div class="form-grid">
         <label>Receipt # <input type="text" id="search-receipt" placeholder="first few characters" /></label>
         <label>Customer name or phone <input type="text" id="search-customer" /></label>
         <label>From date <input type="date" id="search-from" /></label>
         <label>To date <input type="date" id="search-to" /></label>
       </div>
-      <button type="button" id="search-btn" class="primary" style="margin-top: 0.75rem;">Search</button>
-    </div>
+      <button type="button" id="search-btn" class="primary" style="margin-top: 14px;">Search</button>
+    </section>
 
     <div id="search-results" style="margin-top: 1rem;"></div>
     <div id="return-detail" style="margin-top: 1rem;"></div>

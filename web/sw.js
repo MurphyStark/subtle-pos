@@ -8,7 +8,8 @@
 // v7: transfers.html/js are back (owner-only Warehouse moves); mockClient.js has the full
 // catalog -- the bump also forces returning devices to drop the old cached product list.
 // v8: Tracy/Tanya/Admin accounts -- forces devices off the cached old login + mock.
-const CACHE_NAME = 'subtle-pos-shell-v8';
+// v9: redesign phase 1 -- new shell/styles, icons.js + ui.js, brand mark and wordmark.
+const CACHE_NAME = 'subtle-pos-shell-v9';
 const APP_SHELL = [
   './',
   './index.html',
@@ -49,8 +50,12 @@ const APP_SHELL = [
   './js/activity.js',
   './js/activity-page.js',
   './js/transfers.js',
+  './js/icons.js',
+  './js/ui.js',
   './icons/favicon.png',
   './img/logo.png',
+  './img/logo-wordmark.png',
+  './img/mark.png',
 ];
 
 self.addEventListener('install', (event) => {

@@ -4,6 +4,24 @@ No build step, no bundler, no framework — matches the rest of this agency's cl
 Supabase's JS SDK loads from a CDN `<script>` tag as a UMD global; every page's own logic
 is a native ES module (`<script type="module">`) that imports from `js/`.
 
+## Design system (redesign, from the `UX:UI/` mockups)
+
+Phase 1 of 3 is in: every page uses the shared shell and styles. What's where:
+- `css/style.css`: design tokens on `:root` (gold `--brand` for accents, darker
+  `--brand-strong` for filled buttons and the active nav item so white text on it stays
+  readable), then shell, cards, stat cards, tables, pills, forms, checkout and sale-complete.
+- `js/nav.js`: the dark sidebar (grouped, role-filtered links, user at the bottom) plus the
+  location chip and avatar it appends to each page's `<header class="page-header">`.
+  Pages only need `<nav id="app-nav">` and that header.
+- `js/icons.js`: inline Lucide icons, so they work offline.
+- `js/ui.js`: `stockStatus`/`stockPill` (low stock = at or below the variant's reorder
+  threshold, default 2), `statCard`, `thumb`, `renderPagination`.
+- Product photos: `img/products/*.jpg`, generated with the product seed from the stock
+  tracker. Products with no photo show a placeholder.
+
+Phase 2 (still to do): 4-step stock take, stock take history/report, product and variant
+detail pages. Phase 3: Dashboard, Sales, Suppliers, Settings, My Profile.
+
 ## Running it locally
 
 ES modules and the service worker both require a real HTTP origin — opening `index.html`

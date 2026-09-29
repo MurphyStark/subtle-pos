@@ -8,14 +8,23 @@
   <link rel="icon" type="image/png" href="icons/favicon.png" />
   <link rel="apple-touch-icon" href="icons/favicon.png" />
   <meta name="theme-color" content="#111111" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <nav id="app-nav"></nav>
 
   <main>
-    <h1>Raise a purchase order</h1>
-    <div class="card">
+    <header class="page-header">
+      <div>
+        <h1>Purchase Orders</h1>
+        <p class="page-subtitle">Create, manage and track your purchase orders from suppliers.</p>
+      </div>
+    </header>
+    <section class="card">
+      <div class="card-header"><h2 class="card-title">Raise a purchase order</h2></div>
       <form id="po-form" class="admin-form">
         <div class="form-grid">
           <label>Supplier <input type="text" name="supplier_name" required placeholder="e.g. Harare Leather Co." /></label>
@@ -31,7 +40,7 @@
           </label>
         </div>
 
-        <h2 style="font-size: 0.95rem; margin-top: 1rem;">Line items</h2>
+        <h2 style="font-size: 15px; margin: 8px 0 0;">Line items</h2>
         <div class="add-variant-form" style="grid-template-columns: 2fr 1fr 1fr auto;">
           <label>Variant <select id="po-line-variant"></select></label>
           <label>Quantity <input type="number" id="po-line-qty" min="1" step="1" value="1" /></label>
@@ -43,13 +52,13 @@
           <tbody id="po-lines-body"></tbody>
         </table>
 
-        <button type="submit" class="primary" id="po-submit-btn" disabled>Create purchase order</button>
+        <div><button type="submit" class="primary" id="po-submit-btn" disabled>Create purchase order</button></div>
         <p class="error" id="po-error"></p>
-        <p id="po-success" style="color: var(--brand-dark); font-size: 0.9rem;"></p>
+        <p class="success" id="po-success"></p>
       </form>
-    </div>
+    </section>
 
-    <h1 style="margin-top: 1.5rem;">Purchase orders</h1>
+    <h2 class="section-title">Purchase orders</h2>
     <div id="po-list"></div>
   </main>
 

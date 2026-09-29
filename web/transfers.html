@@ -8,14 +8,23 @@
   <link rel="icon" type="image/png" href="icons/favicon.png" />
   <link rel="apple-touch-icon" href="icons/favicon.png" />
   <meta name="theme-color" content="#111111" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <nav id="app-nav"></nav>
 
   <main>
-    <h1>Move stock between Shop and Warehouse</h1>
-    <div class="card">
+    <header class="page-header">
+      <div>
+        <h1>Transfers</h1>
+        <p class="page-subtitle">Move stock between the shop and the warehouse.</p>
+      </div>
+    </header>
+    <section class="card">
+      <div class="card-header"><h2 class="card-title">Move stock</h2></div>
       <form id="transfer-form" class="admin-form">
         <div class="form-grid">
           <label>From <select name="from_location_id"></select></label>
@@ -23,15 +32,15 @@
           <label>Variant <select name="variant_id"></select></label>
           <label>Quantity <input type="number" name="quantity" min="1" step="1" value="1" required /></label>
         </div>
-        <p id="transfer-available" style="color: var(--text-muted); font-size: 0.85rem;"></p>
-        <button type="submit" class="primary">Move stock</button>
+        <p id="transfer-available" class="muted" style="margin: 0; font-size: 14px;"></p>
+        <div><button type="submit" class="primary">Move stock</button></div>
         <p class="error" id="transfer-error"></p>
-        <p id="transfer-success" style="color: var(--brand-dark); font-size: 0.9rem;"></p>
+        <p class="success" id="transfer-success"></p>
       </form>
-    </div>
+    </section>
 
-    <h1 style="margin-top: 1.5rem;">Transfers</h1>
-    <div class="card">
+    <h2 class="section-title">Transfer history</h2>
+    <section class="card">
       <table>
         <thead>
           <tr><th>Date</th><th>From</th><th>To</th><th>Variant</th><th>Qty</th><th>Status</th></tr>
@@ -40,7 +49,7 @@
           <tr><td colspan="6">Loading…</td></tr>
         </tbody>
       </table>
-    </div>
+    </section>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
