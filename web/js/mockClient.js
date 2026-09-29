@@ -17,12 +17,14 @@
 // with an existing demo session (still on the old placeholder products in localStorage)
 // gets reseeded automatically instead of staying stuck on stale sample data.
 // v5: full 107-variant catalog (WhatsApp + photos + price list) and the Warehouse location.
-const STATE_KEY = 'subtle-pos-demo-state-v5';
+// v6: accounts are now Tracy (owner), Tanya (cashier) and Admin -- user_profiles is seeded
+// from DEMO_ACCOUNTS, so the old demo people must be reseeded away.
+const STATE_KEY = 'subtle-pos-demo-state-v6';
 const SESSION_KEY = 'subtle-pos-demo-session-v1';
 
-// Two locations: the shop everyone sells from, and a Warehouse that only the OWNER can see
-// or touch -- mirrors the warehouse_location migration's locations_select policy and
-// restrictive can_access_location() policies. See canSeeRow() below.
+// Two locations: the shop everyone sells from, and a Warehouse that only the ADMIN can see
+// or touch -- mirrors the warehouse_location + admin_role migrations' locations_select
+// policy and restrictive can_access_location() policies. See canSeeRow() below.
 const SHOP_ID = 'loc-shop';
 const WAREHOUSE_ID = 'loc-warehouse';
 export const DEMO_LOCATIONS = [
@@ -32,21 +34,38 @@ export const DEMO_LOCATIONS = [
 
 const MANUAL_SUPPLIER_ID = 'supplier-manual';
 
-// Any of these can sign in with any password. An email that doesn't match one of these
-// still signs in -- as the owner -- so a live demo never gets derailed by a typo. Static
-// identity fields only (email/name/role) -- the actual queryable, mutable user_profiles
-// row (manager_pin, last_seen_at) lives in state.user_profiles, seeded from this list, so
-// those mutations persist across reloads the same way every other table's writes do.
+// The shop's real people: Tracy (shop owner) and Tanya (cashier) sign in with any password,
+// one click from the login page. The Admin account is the only one that can see the
+// Warehouse, so it is NOT offered as a one-click button (see login.js) and needs a real
+// password -- only its SHA-256 is stored here, so reading this file doesn't reveal it.
+// An unknown email is rejected rather than falling back to some default account.
+//
+// Static identity fields only (email/name/role) -- the actual queryable, mutable
+// user_profiles row (manager_pin, last_seen_at) lives in state.user_profiles, seeded from
+// this list, so those mutations persist across reloads the same way every other table's
+// writes do.
 export const DEMO_ACCOUNTS = [
-  { id: 'user-owner', email: 'owner@subtlepos.demo', full_name: 'Tendai Moyo', role: 'owner', primary_location_id: 'loc-shop' },
-  { id: 'user-shop-manager', email: 'manager@subtlepos.demo', full_name: 'Rudo Chikwava', role: 'shop_manager', primary_location_id: 'loc-shop' },
-  { id: 'user-wholesale-manager', email: 'wholesale@subtlepos.demo', full_name: 'Farai Ncube', role: 'wholesale_manager', primary_location_id: 'loc-shop' },
-  { id: 'user-cashier', email: 'cashier@subtlepos.demo', full_name: 'Tapiwa Dube', role: 'cashier', primary_location_id: 'loc-shop' },
+  { id: 'user-owner', email: 'tracy@subtlepos.demo', full_name: 'Tracy', role: 'owner', primary_location_id: 'loc-shop' },
+  { id: 'user-cashier', email: 'tanya@subtlepos.demo', full_name: 'Tanya', role: 'cashier', primary_location_id: 'loc-shop' },
+  {
+    id: 'user-admin',
+    email: 'admin@subtlepos.demo',
+    full_name: 'Admin',
+    role: 'admin',
+    primary_location_id: 'loc-shop',
+    passwordSha256: '7d97462affbd5da5488b01213dedb7b950c3cd5e70ecd3085a6938f0ac572bda',
+    hiddenFromQuickLogin: true,
+  },
 ];
+
+async function sha256Hex(text) {
+  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
 
 // Demo PINs so the manager-PIN discount-approval flow (step 9) is testable out of the box
 // without first visiting a settings screen. Real deployments start with manager_pin null.
-const DEMO_MANAGER_PINS = { 'user-owner': '1234', 'user-shop-manager': '5678' };
+const DEMO_MANAGER_PINS = { 'user-owner': '1234' };
 
 // GENERATED from "Subtle Accessories Stock Tracker.xlsx" (Products + Stock Levels sheets)
 // -- regenerate rather than hand-editing. One product per name (a name whose variants have
@@ -641,7 +660,7 @@ function buildSeed() {
     purchase_orders: [],
     purchase_order_items: [],
     inventory_transfers: [],
-    user_profiles: DEMO_ACCOUNTS.map((a) => ({ ...a, manager_pin: DEMO_MANAGER_PINS[a.id] ?? null, last_seen_at: null })),
+    user_profiles: DEMO_ACCOUNTS.map(({ passwordSha256, hiddenFromQuickLogin, ...a }) => ({ ...a, manager_pin: DEMO_MANAGER_PINS[a.id] ?? null, last_seen_at: null })),
     app_settings: [{ key: 'manual_discount_cap_cents', value: 2000, updated_at: new Date().toISOString() }],
     discount_codes: [
       {
@@ -713,11 +732,11 @@ function saveSession(user) {
   else localStorage.removeItem(SESSION_KEY);
 }
 
-// Mirrors the warehouse_location migration: anyone but the owner sees (and can write) nothing
+// Mirrors the warehouse_location + admin_role migrations: anyone but the admin sees (and can write) nothing
 // that lives at the Warehouse -- not the location itself, its balances, or any count,
 // receipt, purchase order, sale or transfer touching it.
 function canSeeRow(table, row) {
-  if (loadSession()?.role === 'owner') return true;
+  if (loadSession()?.role === 'admin') return true;
   switch (table) {
     case 'locations':
       return row.id !== WAREHOUSE_ID;
@@ -974,7 +993,7 @@ function applyWrite(table, rows) {
         else target.push(row);
         continue;
       }
-      if (!canSeeRow(table, row)) throw new Error('new row violates row-level security policy (Warehouse is owner-only)');
+      if (!canSeeRow(table, row)) throw new Error('new row violates row-level security policy (Warehouse is admin-only)');
       if (target.find((r) => r.id === row.id)) continue; // upsert + ignoreDuplicates semantics
       if (table === 'sale_item_returns') processSaleItemReturn(row); // may throw; mutates row
       target.push(row);
@@ -1113,10 +1132,14 @@ export function createMockClient() {
   return {
     __isDemoClient: true,
     auth: {
-      async signInWithPassword({ email }) {
-        const match =
-          DEMO_ACCOUNTS.find((u) => u.email.toLowerCase() === String(email ?? '').trim().toLowerCase()) ?? DEMO_ACCOUNTS[0];
-        saveSession(match);
+      async signInWithPassword({ email, password }) {
+        const match = DEMO_ACCOUNTS.find((u) => u.email.toLowerCase() === String(email ?? '').trim().toLowerCase());
+        const passwordOk = match && (!match.passwordSha256 || (await sha256Hex(String(password ?? ''))) === match.passwordSha256);
+        if (!passwordOk) {
+          return { data: { session: null }, error: { message: 'Invalid login credentials' } };
+        }
+        const { passwordSha256, hiddenFromQuickLogin, ...sessionUser } = match;
+        saveSession(sessionUser);
         return { data: { session: { user: { id: match.id } } }, error: null };
       },
       async getSession() {
@@ -1138,7 +1161,7 @@ export function createMockClient() {
         const pin = params.p_pin;
         const match = pin
           ? state.user_profiles.find(
-              (u) => u.manager_pin === pin && ['shop_manager', 'wholesale_manager', 'owner'].includes(u.role)
+              (u) => u.manager_pin === pin && ['shop_manager', 'wholesale_manager', 'owner', 'admin'].includes(u.role)
             )
           : null;
         return { data: match ? match.id : null, error: null };

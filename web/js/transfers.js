@@ -3,13 +3,13 @@ import { getClient } from './supabaseClient.js';
 import { renderNav } from './nav.js';
 import { registerServiceWorker } from './pwa.js';
 
-// Owner-only: moves stock between the shop and the Warehouse. The Warehouse is invisible to
+// Admin-only: moves stock between the shop and the Warehouse. The Warehouse is invisible to
 // every other role (warehouse_location migration: locations_select + restrictive
 // can_access_location() policies), so a transfer touching it could never be created or read
 // by anyone else anyway -- requireAuth here just gives them a clean "restricted" page.
 //
 // A move is recorded as a normal inventory_transfers row that goes straight to 'received':
-// the owner is both requester and approver, so the old request -> approve split adds a
+// the admin is both requester and approver, so the old request -> approve split adds a
 // click without adding a control. fn_apply_transfer_receipt (mirrored in the demo mock) does
 // the actual stock movement and weighted-average-cost blending on that status change.
 let profile = null;
@@ -20,7 +20,7 @@ let qtyByVariantLocation = {};
 async function init() {
   registerServiceWorker();
 
-  const auth = await requireAuth(['owner']);
+  const auth = await requireAuth(['admin']);
   if (!auth) return;
   profile = auth.profile;
   renderNav(profile);
