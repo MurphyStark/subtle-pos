@@ -36,7 +36,7 @@ let appliedDiscountCode = null; // the matched discount_codes row, or null
 async function init() {
   registerServiceWorker();
 
-  const auth = await requireAuth(['cashier', 'shop_manager', 'wholesale_manager', 'owner']);
+  const auth = await requireAuth(['cashier', 'shop_manager', 'wholesale_manager', 'owner', 'admin']);
   if (!auth) return;
   profile = auth.profile;
   renderNav(profile);

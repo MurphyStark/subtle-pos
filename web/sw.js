@@ -7,7 +7,8 @@
 // entirely. Added reports/activity, the newest pages.
 // v7: transfers.html/js are back (owner-only Warehouse moves); mockClient.js has the full
 // catalog -- the bump also forces returning devices to drop the old cached product list.
-const CACHE_NAME = 'subtle-pos-shell-v7';
+// v8: Tracy/Tanya/Admin accounts -- forces devices off the cached old login + mock.
+const CACHE_NAME = 'subtle-pos-shell-v8';
 const APP_SHELL = [
   './',
   './index.html',

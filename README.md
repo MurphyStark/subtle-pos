@@ -1,12 +1,14 @@
 # Subtle POS
 
 Offline-first POS + inventory system for Subtle Accessories (Zimbabwe). Two stock
-locations: the **shop** everyone sells from, and a **Warehouse** that only the **owner** can
-see or touch (`20260901091900_warehouse_location.sql` — restrictive RLS on every
+locations: the **shop** everyone sells from, and a **Warehouse** that only the **admin** role can
+see or touch (`20260901091900_warehouse_location.sql` + `20260901092100_admin_role.sql` — restrictive RLS on every
 location-keyed table plus a filtered `v_inventory_balances`; the demo mock mirrors it). The
 original "Home / Wholesale Store" second location was removed earlier (see below);
 wholesale as a *pricing tier* is unaffected. Stock moves between shop and Warehouse on the
-owner-only `transfers.html`. The product catalog in `web/js/mockClient.js` is generated
+admin-only `transfers.html`. Accounts: Tracy (owner), Tanya (cashier), Admin
+(`admin` role = owner powers + Warehouse; in demo mode its login needs a password, the
+others don't). The product catalog in `web/js/mockClient.js` is generated
 from the stock tracker workbook (`../Subtle Accessories Stock Tracker.xlsx`). Source spec: `../subtle pos prd v2 and build
 prompt.md` (a PRD-addendum + VS Code build prompt — not the full original PRD; see the gap
 noted below).

@@ -10,7 +10,7 @@ import { registerServiceWorker } from './pwa.js';
 //
 // Stock is tracked per VARIANT (size/color/SKU), not per product -- see the
 // product_variants migration. Each row here is one variant, with a stock column per
-// location the viewer can see: non-owners only ever get the shop column, because the
+// location the viewer can see: only the admin gets a Warehouse column, because the
 // Warehouse is filtered out server-side (warehouse_location migration), not hidden here.
 //
 // STEP 11: a variant is "low stock" when it has a reorder_threshold set AND its TOTAL
@@ -28,7 +28,7 @@ function isLowStock(row) {
 async function init() {
   registerServiceWorker();
 
-  const auth = await requireAuth(['shop_manager', 'wholesale_manager', 'owner']);
+  const auth = await requireAuth(['shop_manager', 'wholesale_manager', 'owner', 'admin']);
   if (!auth) return;
   renderNav(auth.profile);
 

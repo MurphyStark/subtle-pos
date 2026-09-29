@@ -23,7 +23,7 @@ let userProfiles = [];
 async function init() {
   registerServiceWorker();
 
-  const auth = await requireAuth(['shop_manager', 'wholesale_manager', 'owner']);
+  const auth = await requireAuth(['shop_manager', 'wholesale_manager', 'owner', 'admin']);
   if (!auth) return;
   renderNav(auth.profile);
 

@@ -66,10 +66,10 @@ function renderDemoLogin() {
   panel.hidden = false;
   panel.innerHTML = `
     <p style="font-size: 0.8rem; color: var(--text-muted); margin: 1rem 0 0.5rem;">
-      No Supabase project connected yet — running on sample data. Sign in as:
+      No Supabase project connected yet — running on sample data. Sign in as (Admin signs in with email and password above):
     </p>
     <div style="display: flex; flex-direction: column; gap: 0.4rem;">
-      ${DEMO_ACCOUNTS.map(
+      ${DEMO_ACCOUNTS.filter((acc) => !acc.hiddenFromQuickLogin).map(
         (acc) => `<button type="button" class="ghost demo-account-btn" data-email="${acc.email}">
           ${acc.full_name} — ${acc.role.replace('_', ' ')}
         </button>`
