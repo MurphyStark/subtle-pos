@@ -33,7 +33,8 @@ export async function logActivity(profile, action, description, metadata = {}) {
 async function heartbeatOnce(profile) {
   try {
     const client = getClient();
-    await client.from('user_profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', profile.id);
+    // Via touch_my_presence() -- a direct update of user_profiles is owner-only under RLS.
+    await client.rpc('touch_my_presence');
   } catch (err) {
     console.warn('Presence heartbeat failed (non-blocking):', err);
   }

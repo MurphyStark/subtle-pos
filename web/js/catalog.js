@@ -1,3 +1,5 @@
+import { resizeImage } from './image.js';
+
 // Shared data helpers for the product, variant and stock-take pages: one place that knows
 // how to load the catalog (products + variants + categories + latest price/cost + stock),
 // and how stock actually changes (a stock receipt adds units; a stock count sets them).
@@ -161,4 +163,17 @@ export async function recordStockCount(client, { locationId, countedBy, items, n
   const { error: statusError } = await client.from('stock_counts').update({ status: 'completed', completed_at: nowIso }).eq('id', countId);
   if (statusError) throw new Error(statusError.message);
   return { stockCount: { ...stockCount, status: 'completed' }, items: rows };
+}
+
+// Uploads a product photo (resized first) to the product-images bucket and points the
+// product at it. A fresh file name each time, so browsers don't keep a cached old photo.
+export async function uploadProductPhoto(client, file, productId) {
+  const blob = await resizeImage(file);
+  const path = `${productId}-${Date.now()}.jpg`;
+  const { error } = await client.storage.from('product-images').upload(path, blob, { upsert: true, contentType: 'image/jpeg' });
+  if (error) throw new Error(error.message);
+  const url = client.storage.from('product-images').getPublicUrl(path).data.publicUrl;
+  const { error: updateError } = await client.from('products').update({ image_url: url }).eq('id', productId);
+  if (updateError) throw new Error(updateError.message);
+  return url;
 }
