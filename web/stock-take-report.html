@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Subtle POS — Stock Take Report</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="icons/favicon.png" />
+  <link rel="apple-touch-icon" href="icons/favicon.png" />
+  <meta name="theme-color" content="#111111" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <nav id="app-nav"></nav>
+
+  <main>
+    <nav class="breadcrumbs no-print" aria-label="Breadcrumb"><a href="stock-takes.html">Stock Take History</a><span aria-hidden="true">›</span><span id="crumb-ref">…</span></nav>
+    <header class="page-header">
+      <div>
+        <h1>Stock Take Report</h1>
+        <p class="page-subtitle">Full details of this stock take: variances, adjustments and notes.</p>
+      </div>
+    </header>
+    <p class="error" id="report-error"></p>
+
+    <div class="stat-grid" id="report-stats"></div>
+
+    <section class="card info-bar" id="report-info"></section>
+
+    <div class="split-layout">
+      <section class="card">
+        <div class="card-header"><div><h2 class="card-title">Stock take details</h2><p class="card-subtitle">System stock against the physical count, with variances and adjustments.</p></div></div>
+        <div class="toolbar no-print">
+          <label class="search"><svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input type="search" id="report-search" placeholder="Search products, SKU or barcode…" aria-label="Search items" /></label>
+          <select id="report-category" aria-label="Category"><option value="">All categories</option></select>
+          <select id="report-variance" aria-label="Variance">
+            <option value="">All items</option>
+            <option value="shortage">Shortages</option>
+            <option value="overage">Overages</option>
+            <option value="match">Matches</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Product</th><th>SKU</th><th>Category</th><th class="num">System stock</th><th class="num">Counted stock</th><th>Variance</th><th>Adjustment</th><th class="num">New stock</th><th>Status</th><th>Notes</th></tr></thead>
+            <tbody id="report-body"><tr><td colspan="11" class="muted">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+      <aside class="split-side" id="report-side"></aside>
+    </div>
+
+    <div class="card wizard-footer no-print">
+      <a class="button ghost lg" href="stock-takes.html">Back to history</a>
+      <a class="button primary lg" href="stock-take.html">Start new stock take</a>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="js/stock-take-report.js"></script>
+</body>
+</html>

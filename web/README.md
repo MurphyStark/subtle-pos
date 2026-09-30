@@ -19,8 +19,24 @@ Phase 1 of 3 is in: every page uses the shared shell and styles. What's where:
 - Product photos: `img/products/*.jpg`, generated with the product seed from the stock
   tracker. Products with no photo show a placeholder.
 
-Phase 2 (still to do): 4-step stock take, stock take history/report, product and variant
-detail pages. Phase 3: Dashboard, Sales, Suppliers, Settings, My Profile.
+Phase 2 is in too:
+- `stock-take.html`: 4 steps (select, count, review, complete). Only the selected variants
+  are counted and adjusted. Progress is saved on the device after every change, so a reload
+  picks up where you left off. `?variant=<id>` jumps straight to counting one item.
+- `stock-takes.html` (history) and `stock-take-report.html?id=` (details + printable
+  report + CSV export). The mockups' "details" and "report" screens are one page.
+  References look like `ST-20260929-3F2A`: date plus the first characters of the count id.
+- `product.html` (add) / `product.html?id=` (edit): details, image, variants, cost.
+  Deleting a product or variant sets `is_active = false`, so history is kept.
+- `variant.html?id=`: stock per location, 30-day in/out chart, and a transaction list built
+  from sales, returns, receipts, counts and transfers. Quick actions: Add stock (a stock
+  receipt), Remove / Set level (a one-line stock count, with the reason as the note), and
+  Stock count.
+- `js/catalog.js`: shared catalog loading plus `receiveStock` / `recordStockCount`.
+- Migration `20260901092200_stock_notes_and_brand.sql`: notes on counts, count lines and
+  receipts, plus `products.brand`.
+
+Phase 3 (still to do): Dashboard, Sales, Suppliers, Settings, My Profile.
 
 ## Running it locally
 
