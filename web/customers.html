@@ -8,27 +8,39 @@
   <link rel="icon" type="image/png" href="icons/favicon.png" />
   <link rel="apple-touch-icon" href="icons/favicon.png" />
   <meta name="theme-color" content="#111111" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <nav id="app-nav"></nav>
 
   <main>
-    <h1>Add a customer</h1>
-    <div class="card">
+    <header class="page-header">
+      <div>
+        <h1>Customers</h1>
+        <p class="page-subtitle">Manage your customer database and view purchase history.</p>
+      </div>
+    </header>
+    <section class="card">
+      <div class="card-header"><h2 class="card-title">Add a customer</h2></div>
       <form id="customer-form" class="admin-form">
         <div class="form-grid">
           <label>Name <input type="text" name="name" required /></label>
           <label>Phone <input type="tel" name="phone" /></label>
           <label>Email <input type="email" name="email" /></label>
         </div>
-        <button type="submit" class="primary">Add customer</button>
+        <div><button type="submit" class="primary">Add customer</button></div>
         <p class="error" id="customer-error"></p>
       </form>
-    </div>
+    </section>
 
-    <h1 style="margin-top: 1.5rem;">Customers</h1>
-    <input type="search" id="customer-search" class="product-search" placeholder="Search by name or phone…" />
+    <h2 class="section-title">Customer list</h2>
+    <label class="search" style="margin-bottom: 14px;">
+      <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="search" id="customer-search" placeholder="Search by name or phone…" aria-label="Search customers" />
+    </label>
     <div id="customer-list"></div>
     <div id="customer-detail" style="margin-top: 1rem;"></div>
   </main>

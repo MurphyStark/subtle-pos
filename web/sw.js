@@ -8,7 +8,9 @@
 // v7: transfers.html/js are back (owner-only Warehouse moves); mockClient.js has the full
 // catalog -- the bump also forces returning devices to drop the old cached product list.
 // v8: Tracy/Tanya/Admin accounts -- forces devices off the cached old login + mock.
-const CACHE_NAME = 'subtle-pos-shell-v8';
+// v9: redesign phase 1 -- new shell/styles, icons.js + ui.js, brand mark and wordmark.
+// v10: redesign phase 2 -- stock take wizard/history/report, product and variant pages.
+const CACHE_NAME = 'subtle-pos-shell-v10';
 const APP_SHELL = [
   './',
   './index.html',
@@ -22,6 +24,10 @@ const APP_SHELL = [
   './reports.html',
   './activity.html',
   './transfers.html',
+  './stock-takes.html',
+  './stock-take-report.html',
+  './product.html',
+  './variant.html',
   './manifest.webmanifest',
   './css/style.css',
   './js/config.js',
@@ -49,8 +55,17 @@ const APP_SHELL = [
   './js/activity.js',
   './js/activity-page.js',
   './js/transfers.js',
+  './js/icons.js',
+  './js/ui.js',
+  './js/catalog.js',
+  './js/stock-takes.js',
+  './js/stock-take-report.js',
+  './js/product.js',
+  './js/variant.js',
   './icons/favicon.png',
   './img/logo.png',
+  './img/logo-wordmark.png',
+  './img/mark.png',
 ];
 
 self.addEventListener('install', (event) => {

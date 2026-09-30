@@ -4,6 +4,40 @@ No build step, no bundler, no framework — matches the rest of this agency's cl
 Supabase's JS SDK loads from a CDN `<script>` tag as a UMD global; every page's own logic
 is a native ES module (`<script type="module">`) that imports from `js/`.
 
+## Design system (redesign, from the `UX:UI/` mockups)
+
+Phase 1 of 3 is in: every page uses the shared shell and styles. What's where:
+- `css/style.css`: design tokens on `:root` (gold `--brand` for accents, darker
+  `--brand-strong` for filled buttons and the active nav item so white text on it stays
+  readable), then shell, cards, stat cards, tables, pills, forms, checkout and sale-complete.
+- `js/nav.js`: the dark sidebar (grouped, role-filtered links, user at the bottom) plus the
+  location chip and avatar it appends to each page's `<header class="page-header">`.
+  Pages only need `<nav id="app-nav">` and that header.
+- `js/icons.js`: inline Lucide icons, so they work offline.
+- `js/ui.js`: `stockStatus`/`stockPill` (low stock = at or below the variant's reorder
+  threshold, default 2), `statCard`, `thumb`, `renderPagination`.
+- Product photos: `img/products/*.jpg`, generated with the product seed from the stock
+  tracker. Products with no photo show a placeholder.
+
+Phase 2 is in too:
+- `stock-take.html`: 4 steps (select, count, review, complete). Only the selected variants
+  are counted and adjusted. Progress is saved on the device after every change, so a reload
+  picks up where you left off. `?variant=<id>` jumps straight to counting one item.
+- `stock-takes.html` (history) and `stock-take-report.html?id=` (details + printable
+  report + CSV export). The mockups' "details" and "report" screens are one page.
+  References look like `ST-20260929-3F2A`: date plus the first characters of the count id.
+- `product.html` (add) / `product.html?id=` (edit): details, image, variants, cost.
+  Deleting a product or variant sets `is_active = false`, so history is kept.
+- `variant.html?id=`: stock per location, 30-day in/out chart, and a transaction list built
+  from sales, returns, receipts, counts and transfers. Quick actions: Add stock (a stock
+  receipt), Remove / Set level (a one-line stock count, with the reason as the note), and
+  Stock count.
+- `js/catalog.js`: shared catalog loading plus `receiveStock` / `recordStockCount`.
+- Migration `20260901092200_stock_notes_and_brand.sql`: notes on counts, count lines and
+  receipts, plus `products.brand`.
+
+Phase 3 (still to do): Dashboard, Sales, Suppliers, Settings, My Profile.
+
 ## Running it locally
 
 ES modules and the service worker both require a real HTTP origin — opening `index.html`

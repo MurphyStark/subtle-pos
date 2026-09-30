@@ -8,19 +8,28 @@
   <link rel="icon" type="image/png" href="icons/favicon.png" />
   <link rel="apple-touch-icon" href="icons/favicon.png" />
   <meta name="theme-color" content="#111111" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <nav id="app-nav"></nav>
 
   <main>
-    <h1>Who's online</h1>
-    <div class="card">
+    <header class="page-header">
+      <div>
+        <h1>Activity</h1>
+        <p class="page-subtitle">Track system activity, transactions and user actions.</p>
+      </div>
+    </header>
+    <section class="card">
+      <div class="card-header"><h2 class="card-title">Who's online</h2></div>
       <div id="presence-list"></div>
-    </div>
+    </section>
 
-    <h1 style="margin-top: 1.5rem;">Activity log</h1>
-    <div class="card">
+    <section class="card">
+      <div class="card-header"><div><h2 class="card-title">Activity log</h2><p class="card-subtitle">A record of all important actions in your store.</p></div></div>
       <div class="form-grid">
         <label>User
           <select id="filter-user"><option value="">All staff</option></select>
@@ -31,8 +40,8 @@
         <label>From <input type="date" id="filter-from" /></label>
         <label>To <input type="date" id="filter-to" /></label>
       </div>
-      <div id="activity-table" style="margin-top: 0.75rem;"></div>
-    </div>
+      <div id="activity-table" class="table-wrap" style="margin-top: 14px;"></div>
+    </section>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

@@ -8,35 +8,39 @@
   <link rel="icon" type="image/png" href="icons/favicon.png" />
   <link rel="apple-touch-icon" href="icons/favicon.png" />
   <meta name="theme-color" content="#111111" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <nav id="app-nav"></nav>
 
   <main>
-    <h1>Stock take</h1>
-    <p style="color: var(--text-muted); margin-top: -0.5rem;">
-      Count what's actually on the shelf. Whatever you enter here becomes the new system
-      quantity for that product at this location the moment you complete the count.
-    </p>
-
-    <div class="card" style="margin-bottom: 1rem;">
-      <label style="display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.85rem; color: var(--text-muted); max-width: 320px;">
-        Location
-        <select id="location-select"></select>
-      </label>
-    </div>
+    <header class="page-header">
+      <div>
+        <h1>Stock Take</h1>
+        <p class="page-subtitle">Count and reconcile your physical stock with system records.</p>
+      </div>
+      <div class="page-actions">
+        <a class="button ghost" href="stock-takes.html">History</a>
+      </div>
+    </header>
 
     <div id="status-banner"></div>
 
-    <div class="card">
-      <div id="stock-take-body">Loading…</div>
-    </div>
+    <ol class="stepper card" id="stepper" aria-label="Stock take steps">
+      <li data-step="1"><span class="step-dot">1</span><span><strong>Select products</strong><small>Choose items to count</small></span></li>
+      <li data-step="2"><span class="step-dot">2</span><span><strong>Count stock</strong><small>Enter physical quantities</small></span></li>
+      <li data-step="3"><span class="step-dot">3</span><span><strong>Review</strong><small>Check variances</small></span></li>
+      <li data-step="4"><span class="step-dot">4</span><span><strong>Complete</strong><small>Post stock take</small></span></li>
+    </ol>
 
-    <button type="button" id="complete-btn" class="primary" style="margin-top: 1rem;" disabled>
-      Complete stock take
-    </button>
-    <p class="error" id="stock-take-error"></p>
+    <div class="split-layout">
+      <section class="card" id="step-main">Loading…</section>
+      <aside class="split-side" id="step-side"></aside>
+    </div>
+    <div class="card wizard-footer" id="step-footer" hidden></div>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

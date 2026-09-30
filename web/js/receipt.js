@@ -1,4 +1,5 @@
 import { formatCents } from './money.js';
+import { icon } from './icons.js';
 import { isThermalPrintAvailable, printThermalReceipt } from './thermal-print.js';
 
 // Renders a Subtle Accessories-branded receipt overlay after a completed sale. Printable
@@ -46,52 +47,91 @@ export function showReceipt(data) {
   const overlay = document.createElement('div');
   overlay.id = 'receipt-overlay';
   overlay.className = 'receipt-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-labelledby', 'sale-complete-title');
 
-  const dateStr = new Date(sale.created_at).toLocaleString();
+  const saleDate = new Date(sale.created_at);
+  const dateStr = saleDate.toLocaleString();
+  const niceDate = `${saleDate.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })} · ${saleDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
   const shortId = sale.id.slice(0, 8).toUpperCase();
 
+  // The on-screen "Sale complete" card, with the classic paper receipt kept inside it
+  // (hidden on screen, the only thing visible when printing -- see @media print).
   overlay.innerHTML = `
-    <div class="receipt-paper">
-      <img src="img/logo.png" alt="Subtle Accessories" class="receipt-logo" />
-      <p class="tagline">${locationName ?? ''}</p>
-      <hr />
-      <div class="receipt-line"><span>Receipt #</span><span>${shortId}</span></div>
-      <div class="receipt-line"><span>Date</span><span>${dateStr}</span></div>
-      <div class="receipt-line"><span>Served by</span><span>${cashierName ?? ''}</span></div>
-      <div class="receipt-line"><span>Sale type</span><span>${sale.sale_type}</span></div>
-      <hr />
-      ${lines
-        .map(
-          (l) => `
-        <div class="receipt-line">
-          <span class="receipt-item-name">${l.quantity} × ${l.name}${l.variantLabel ? ` (${l.variantLabel})` : ''}</span>
-          <span>${formatCents(l.quantity * l.unitPriceCents, sale.currency)}</span>
-        </div>`
-        )
-        .join('')}
-      <hr />
-      <div class="receipt-totals">
-        <div class="receipt-line"><span>Subtotal</span><span>${formatCents(sale.subtotal_cents, sale.currency)}</span></div>
-        ${sale.discount_cents ? `<div class="receipt-line"><span>Discount</span><span>-${formatCents(sale.discount_cents, sale.currency)}</span></div>` : ''}
-        ${sale.tax_cents ? `<div class="receipt-line"><span>Tax</span><span>${formatCents(sale.tax_cents, sale.currency)}</span></div>` : ''}
-        <div class="receipt-line grand"><span>TOTAL</span><span>${formatCents(sale.total_cents, sale.currency)}</span></div>
+    <div class="sale-complete">
+      <button type="button" class="close-x" id="receipt-close" aria-label="Close">${icon('close', { size: 22 })}</button>
+      <span class="success-mark">${icon('check', { size: 38 })}</span>
+      <h2 id="sale-complete-title">Sale complete!</h2>
+      <div class="sale-total">${formatCents(sale.total_cents, sale.currency)}</div>
+      <div class="sale-meta">Receipt #${shortId}</div>
+      <div class="sale-meta">${niceDate}</div>
+
+      <div class="share-grid">
+        <button type="button" class="share-tile" id="receipt-print">${icon('printer', { size: 26 })}<strong>Print receipt</strong><small>Print to connected printer</small></button>
+        <button type="button" class="share-tile whatsapp" id="receipt-whatsapp">${icon('chat', { size: 26 })}<strong>WhatsApp receipt</strong><small>Send to customer</small></button>
+        <button type="button" class="share-tile" id="receipt-email">${icon('mail', { size: 26 })}<strong>Email receipt</strong><small>Send to customer</small></button>
       </div>
-      <p class="receipt-footer">Thank you for shopping with Subtle Accessories!<br />All sales are final unless returned with this receipt.</p>
-      <div class="receipt-actions">
-        <button type="button" class="ghost" id="receipt-close">Close</button>
-        <button type="button" class="primary" id="receipt-print">Print</button>
+      ${isThermalPrintAvailable() ? `<button type="button" class="ghost" id="receipt-thermal" style="width: 100%; margin-bottom: 10px;">${icon('printer', { size: 18 })} Thermal print</button>` : ''}
+      <button type="button" class="primary lg" id="receipt-new-sale" style="width: 100%;">${icon('receipt', { size: 20 })} New sale</button>
+      <p class="error" id="receipt-share-error"></p>
+
+      <div class="sale-lines">
+        ${lines
+          .map(
+            (l) => `
+          <div class="line">
+            ${l.imageUrl ? `<img class="thumb thumb-sm" src="${l.imageUrl}" alt="" />` : `<span class="thumb thumb-sm thumb-empty">${icon('image', { size: 16 })}</span>`}
+            <span class="grow"><strong>${l.name}</strong>${l.variantLabel ? `<br /><span class="muted">${l.variantLabel}</span>` : ''}</span>
+            <span class="muted">${l.quantity} × ${formatCents(l.unitPriceCents, sale.currency)}</span>
+            <strong>${formatCents(l.quantity * l.unitPriceCents, sale.currency)}</strong>
+          </div>`
+          )
+          .join('')}
       </div>
-      <div class="receipt-actions">
-        <button type="button" class="ghost" id="receipt-whatsapp">WhatsApp</button>
-        <button type="button" class="ghost" id="receipt-email">Email</button>
-        ${isThermalPrintAvailable() ? '<button type="button" class="ghost" id="receipt-thermal">Thermal print</button>' : ''}
+
+      <div class="receipt-paper">
+        <img src="img/logo.png" alt="Subtle Accessories" class="receipt-logo" />
+        <p class="tagline">${locationName ?? ''}</p>
+        <hr />
+        <div class="receipt-line"><span>Receipt #</span><span>${shortId}</span></div>
+        <div class="receipt-line"><span>Date</span><span>${dateStr}</span></div>
+        <div class="receipt-line"><span>Served by</span><span>${cashierName ?? ''}</span></div>
+        <hr />
+        ${lines
+          .map(
+            (l) => `
+          <div class="receipt-line">
+            <span class="receipt-item-name">${l.quantity} × ${l.name}${l.variantLabel ? ` (${l.variantLabel})` : ''}</span>
+            <span>${formatCents(l.quantity * l.unitPriceCents, sale.currency)}</span>
+          </div>`
+          )
+          .join('')}
+        <hr />
+        <div class="receipt-totals">
+          <div class="receipt-line"><span>Subtotal</span><span>${formatCents(sale.subtotal_cents, sale.currency)}</span></div>
+          ${sale.discount_cents ? `<div class="receipt-line"><span>Discount</span><span>-${formatCents(sale.discount_cents, sale.currency)}</span></div>` : ''}
+          ${sale.tax_cents ? `<div class="receipt-line"><span>Tax</span><span>${formatCents(sale.tax_cents, sale.currency)}</span></div>` : ''}
+          <div class="receipt-line grand"><span>TOTAL</span><span>${formatCents(sale.total_cents, sale.currency)}</span></div>
+        </div>
+        <p class="receipt-footer">Thank you for shopping with Subtle Accessories!<br />All sales are final unless returned with this receipt.</p>
       </div>
-      <p class="error" id="receipt-share-error" style="margin-top: 0.5rem;"></p>
     </div>
   `;
 
   document.body.appendChild(overlay);
-  document.getElementById('receipt-close').addEventListener('click', () => overlay.remove());
+  const close = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', onKey);
+    document.getElementById('product-search')?.focus();
+  };
+  const onKey = (e) => {
+    if (e.key === 'Escape') close();
+  };
+  document.addEventListener('keydown', onKey);
+  document.getElementById('receipt-close').addEventListener('click', close);
+  document.getElementById('receipt-new-sale').addEventListener('click', close);
+  document.getElementById('receipt-new-sale').focus();
   document.getElementById('receipt-print').addEventListener('click', () => window.print());
 
   document.getElementById('receipt-whatsapp').addEventListener('click', () => {

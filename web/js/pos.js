@@ -7,6 +7,8 @@ import { renderNav } from './nav.js';
 import { registerServiceWorker } from './pwa.js';
 import { showReceipt } from './receipt.js';
 import { logActivity } from './activity.js';
+import { icon } from './icons.js';
+import { thumb, stockStatus, stockPill } from './ui.js';
 
 // MVP simplification, flagged in the README: one currency and one payment method per sale.
 // Split/multi-currency tender (sale_payments supports it) is a stretch goal, not built yet.
@@ -24,6 +26,7 @@ let products = []; // [{ ...product fields, retail_price_cents, currency, varian
 let cart = []; // [{ product, variant, quantity }]
 let locationName = '';
 let balancesByVariant = {}; // variant_id -> quantity_available at the CURRENT location, display-only
+let activeCategory = null; // category name, or null for All
 
 // STEP 9 (promotions): a manual discount above this cap needs a manager's PIN, verified
 // against verify_manager_pin() at checkout time so the approving manager's id (not the PIN
@@ -44,7 +47,9 @@ async function init() {
   await loadProducts();
   await loadLocationName();
   await loadDiscountCap();
+  renderCategoryChips();
   renderProductGrid();
+  renderCart();
   wireControls();
 
   initSyncListeners(refreshStatusBanner);
@@ -81,9 +86,14 @@ async function loadProducts() {
       const client = getClient();
       const { data: prods, error: prodError } = await client
         .from('products')
-        .select('id, name, base_currency, is_active')
+        .select('id, name, base_currency, is_active, image_url, category_id')
         .eq('is_active', true);
       if (prodError) throw prodError;
+
+      // Category NAME is baked onto each product (like price, below) so the offline cache
+      // can still group the grid without a separate categories cache.
+      const { data: categories } = await client.from('categories').select('id, name');
+      const categoryName = Object.fromEntries((categories ?? []).map((c) => [c.id, c.name]));
 
       const { data: variantRows, error: variantError } = await client
         .from('product_variants')
@@ -109,6 +119,7 @@ async function loadProducts() {
         ...p,
         retail_price_cents: latest[`${p.id}:retail`]?.unit_price_cents ?? null,
         currency: latest[`${p.id}:retail`]?.currency ?? p.base_currency,
+        category_name: categoryName[p.category_id] ?? null,
       }));
 
       await cacheProducts(enrichedProducts);
@@ -209,26 +220,65 @@ function variantLabel(variant) {
   return [variant.size, variant.color].filter(Boolean).join(' / ');
 }
 
+function variantNoun(product) {
+  const colours = product.variants.filter((v) => v.color).length;
+  const n = product.variants.length;
+  if (n === 1) return '1 variant';
+  return colours === n ? `${n} colours` : `${n} variants`;
+}
+
+function productStock(product) {
+  return product.variants.reduce((sum, v) => sum + (balancesByVariant[v.id] ?? 0), 0);
+}
+
+function renderCategoryChips() {
+  const container = document.getElementById('category-chips');
+  const names = [...new Set(products.map((p) => p.category_name).filter(Boolean))].sort();
+  if (names.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+  container.innerHTML = [null, ...names]
+    .map(
+      (name) =>
+        `<button type="button" class="chip${activeCategory === name ? ' active' : ''}" role="tab" aria-selected="${activeCategory === name}" data-category="${name ?? ''}">${name ?? 'All'}</button>`
+    )
+    .join('');
+  container.querySelectorAll('.chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      activeCategory = chip.dataset.category || null;
+      renderCategoryChips();
+      renderProductGrid(document.getElementById('product-search').value);
+    });
+  });
+}
+
 function renderProductGrid(filter = '') {
   const grid = document.getElementById('product-grid');
   const term = filter.trim().toLowerCase();
   const visible = products.filter((p) => {
     if (currentPriceCents(p) == null) return false; // no price set for this sale type
+    if (activeCategory && p.category_name !== activeCategory) return false;
     if (!term) return true;
     if (p.name.toLowerCase().includes(term)) return true;
     return p.variants.some((v) => (v.sku ?? '').toLowerCase().includes(term) || (v.barcode ?? '').toLowerCase() === term);
   });
 
-  grid.innerHTML = visible
-    .map(
-      (p) => `
-      <button type="button" class="product-tile" data-id="${p.id}">
+  grid.innerHTML =
+    visible
+      .map((p) => {
+        const status = stockStatus(productStock(p));
+        return `
+      <button type="button" class="product-tile" data-id="${p.id}" aria-label="Add ${p.name}">
+        ${thumb(p.image_url, '', 'lg')}
+        ${status === 'in' ? '' : `<span class="stock-flag">${stockPill(status)}</span>`}
         <span class="name">${p.name}</span>
         <span class="price">${formatCents(currentPriceCents(p), p.currency)}</span>
-        ${p.variants.length > 1 ? `<span class="variant-count">${p.variants.length} options</span>` : ''}
-      </button>`
-    )
-    .join('');
+        <span class="variant-count">${variantNoun(p)}</span>
+        <span class="add-badge">${icon('plus', { size: 18 })}</span>
+      </button>`;
+      })
+      .join('') || '<p class="muted">No products match.</p>';
 
   grid.querySelectorAll('.product-tile').forEach((tile) => {
     tile.addEventListener('click', () => {
@@ -323,29 +373,34 @@ function setQuantity(variantId, quantity) {
 
 function renderCart() {
   const container = document.getElementById('cart-lines');
+  const count = cart.reduce((sum, l) => sum + l.quantity, 0);
+  document.getElementById('cart-count').textContent = count ? `(${count} item${count === 1 ? '' : 's'})` : '';
+  document.getElementById('cart-clear').hidden = cart.length === 0;
 
-  const linesHtml =
+  container.innerHTML =
     cart
       .map((line) => {
         const label = variantLabel(line.variant);
+        const unit = currentPriceCents(line.product);
         return `
       <div class="cart-line" data-id="${line.variant.id}">
-        <div>
-          <div>${line.product.name}${label ? ` — ${label}` : ''}</div>
-          <div style="color: var(--text-muted); font-size: 0.8rem;">
-            ${formatCents(currentPriceCents(line.product), line.product.currency)} each
-          </div>
+        ${thumb(line.product.image_url, '', 'md')}
+        <div class="cart-line-info">
+          <div class="cart-line-name">${line.product.name}</div>
+          ${label ? `<div class="cart-line-variant">${label}</div>` : ''}
+          <div class="cart-line-price">${formatCents(unit, line.product.currency)}</div>
         </div>
-        <div class="qty-controls">
-          <button type="button" class="ghost qty-minus">−</button>
-          <span>${line.quantity}</span>
-          <button type="button" class="ghost qty-plus">+</button>
+        <div class="cart-line-right">
+          <div class="qty-controls">
+            <button type="button" class="qty-minus" aria-label="One less">${icon('minus', { size: 16 })}</button>
+            <span>${line.quantity}</span>
+            <button type="button" class="qty-plus" aria-label="One more">${icon('plus', { size: 16 })}</button>
+          </div>
+          <strong>${formatCents(unit * line.quantity, line.product.currency)}</strong>
         </div>
       </div>`;
       })
-      .join('') || '<p style="color: var(--text-muted);">Cart is empty — tap a product to add it.</p>';
-
-  container.innerHTML = linesHtml;
+      .join('') || `<div class="cart-empty">${icon('cart', { size: 28 })}<p>Cart is empty. Tap a product to add it.</p></div>`;
 
   container.querySelectorAll('.cart-line').forEach((el) => {
     const id = el.dataset.id;
@@ -366,10 +421,19 @@ function renderTotals() {
   const currency = cart[0]?.product.currency ?? 'USD';
 
   document.getElementById('cart-subtotal').textContent = formatCents(subtotalCents, currency);
+  document.getElementById('cart-discount-total').textContent = `−${formatCents(totalDiscountCents, currency)}`;
+  document.getElementById('cart-tax-total').textContent = formatCents(taxCents, currency);
   document.getElementById('cart-total').textContent = formatCents(totalCents, currency);
   document.getElementById('manager-pin-row').hidden = manualDiscountCents <= manualDiscountCapCents;
 
-  document.getElementById('checkout-btn').disabled = cart.length === 0;
+  const checkoutBtn = document.getElementById('checkout-btn');
+  checkoutBtn.disabled = cart.length === 0;
+  checkoutBtn.textContent = cart.length === 0 ? 'Complete sale' : `Charge ${formatCents(totalCents, currency)}`;
+
+  const count = cart.reduce((sum, l) => sum + l.quantity, 0);
+  const bar = document.getElementById('mobile-cart-bar');
+  bar.hidden = count === 0;
+  bar.textContent = `View cart · ${count} item${count === 1 ? '' : 's'} · ${formatCents(totalCents, currency)}`;
 }
 
 function wireControls() {
@@ -389,6 +453,13 @@ function wireControls() {
   document.getElementById('apply-discount-code-btn').addEventListener('click', handleApplyDiscountCode);
 
   document.getElementById('checkout-btn').addEventListener('click', completeSale);
+  document.getElementById('mobile-cart-bar').addEventListener('click', () => {
+    document.getElementById('cart-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  document.getElementById('cart-clear').addEventListener('click', () => {
+    cart = [];
+    renderCart();
+  });
 }
 
 // STEP 8: customer lookup/attach at checkout. Deliberately online-only -- unlike the sale
@@ -539,6 +610,7 @@ async function completeSale() {
     variantLabel: variantLabel(line.variant),
     quantity: line.quantity,
     unitPriceCents: currentPriceCents(line.product),
+    imageUrl: line.product.image_url ?? null,
   }));
 
   await logActivity(

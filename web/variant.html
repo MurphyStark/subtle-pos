@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Subtle POS — Variant details</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="icons/favicon.png" />
+  <link rel="apple-touch-icon" href="icons/favicon.png" />
+  <meta name="theme-color" content="#111111" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <nav id="app-nav"></nav>
+
+  <main>
+    <a class="back-link" href="inventory.html"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg> Back to inventory</a>
+    <header class="page-header">
+      <div>
+        <h1>Variant details</h1>
+        <p class="page-subtitle">Stock levels, movement history and details for this product variant.</p>
+      </div>
+      <div class="page-actions">
+        <a class="button primary" id="edit-product-link" href="admin.html"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg> Edit product</a>
+      </div>
+    </header>
+    <p class="error" id="page-error"></p>
+
+    <div class="split-layout wide-side" id="variant-page">
+      <div class="stack">
+        <section class="card">
+          <div class="variant-hero" id="variant-hero"></div>
+          <div class="stat-grid compact" id="variant-stats"></div>
+        </section>
+        <section class="card">
+          <div class="card-header">
+            <h2 class="card-title">Stock movement <span class="muted" style="font-weight: 500;">(last 30 days)</span></h2>
+            <div class="chart-legend"><span><i style="background: #2f9e5b"></i>Stock in</span><span><i style="background: #e5484d"></i>Stock out</span></div>
+          </div>
+          <div id="movement-chart"></div>
+        </section>
+        <section class="card">
+          <div class="card-header">
+            <h2 class="card-title">Recent stock transactions</h2>
+            <button type="button" class="link-button" id="toggle-all-tx" hidden>View all</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead id="tx-head"></thead>
+              <tbody id="tx-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <aside class="stack">
+        <section class="card">
+          <h2 class="card-title">Quick stock actions</h2>
+          <p class="card-subtitle" style="margin-bottom: 14px;">Update stock levels for this variant.</p>
+          <div class="action-tiles">
+            <button type="button" class="action-tile tone-green-soft" data-action="add"><strong>Add stock</strong><small>Increase stock level</small></button>
+            <button type="button" class="action-tile tone-red-soft" data-action="remove"><strong>Remove stock</strong><small>Decrease stock level</small></button>
+            <button type="button" class="action-tile tone-amber-soft" data-action="set"><strong>Set stock level</strong><small>Update to a specific quantity</small></button>
+            <a class="action-tile tone-blue-soft" data-action="count" href="stock-take.html"><strong>Stock count</strong><small>Verify current stock</small></a>
+          </div>
+          <div id="action-panel"></div>
+        </section>
+        <section class="card">
+          <h2 class="card-title" style="margin-bottom: 10px;">Stock by location</h2>
+          <table class="compact-table"><thead><tr><th>Location</th><th class="num">Quantity</th><th></th></tr></thead><tbody id="location-body"></tbody></table>
+        </section>
+        <section class="card">
+          <div class="card-header" style="margin-bottom: 8px;">
+            <h2 class="card-title">All variants of this product</h2>
+            <a id="manage-variants" href="admin.html">Manage variants</a>
+          </div>
+          <table class="compact-table"><thead><tr><th>Variant</th><th class="num">Stock</th><th>Status</th></tr></thead><tbody id="siblings-body"></tbody></table>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="js/variant.js"></script>
+</body>
+</html>

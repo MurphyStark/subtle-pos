@@ -17,9 +17,11 @@
 // with an existing demo session (still on the old placeholder products in localStorage)
 // gets reseeded automatically instead of staying stuck on stale sample data.
 // v5: full 107-variant catalog (WhatsApp + photos + price list) and the Warehouse location.
+// v8: product brands (redesign phase 2).
+// v7: product photos + categories (redesign phase 1).
 // v6: accounts are now Tracy (owner), Tanya (cashier) and Admin -- user_profiles is seeded
 // from DEMO_ACCOUNTS, so the old demo people must be reseeded away.
-const STATE_KEY = 'subtle-pos-demo-state-v6';
+const STATE_KEY = 'subtle-pos-demo-state-v8';
 const SESSION_KEY = 'subtle-pos-demo-session-v1';
 
 // Two locations: the shop everyone sells from, and a Warehouse that only the ADMIN can see
@@ -80,6 +82,8 @@ const PRODUCT_SEED = [
   {
     name: "Chanel Quilted Flap Bag",
     category: "Bags",
+    image: "img/products/chanel-quilted-flap-bag.jpg",
+    brand: "Chanel",
     description: null,
     retail: 8500,
     cost: 8500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -90,6 +94,8 @@ const PRODUCT_SEED = [
   {
     name: "Christian Dior Saddle Bag",
     category: "Bags",
+    image: "img/products/christian-dior-saddle-bag.jpg",
+    brand: "Christian Dior",
     description: null,
     retail: 7500,
     cost: 7500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -101,6 +107,8 @@ const PRODUCT_SEED = [
   {
     name: "D&G Logo Shoulder Bag",
     category: "Bags",
+    image: "img/products/d-g-logo-shoulder-bag.jpg",
+    brand: "Dolce & Gabbana",
     description: null,
     retail: 7500,
     cost: 7500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -112,6 +120,8 @@ const PRODUCT_SEED = [
   {
     name: "Gucci Half-Moon Bag",
     category: "Bags",
+    image: "img/products/gucci-half-moon-bag.jpg",
+    brand: "Gucci",
     description: null,
     retail: 10000,
     cost: 10000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -122,6 +132,8 @@ const PRODUCT_SEED = [
   {
     name: "Jacquemus Long Handbag",
     category: "Bags",
+    image: "img/products/jacquemus-long-handbag.jpg",
+    brand: "Jacquemus",
     description: null,
     retail: 7000,
     cost: 7000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -133,6 +145,8 @@ const PRODUCT_SEED = [
   {
     name: "Louis Vuitton Twist Bag",
     category: "Bags",
+    image: "img/products/louis-vuitton-twist-bag.jpg",
+    brand: "Louis Vuitton",
     description: null,
     retail: 9000,
     cost: 9000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -143,6 +157,8 @@ const PRODUCT_SEED = [
   {
     name: "Louis Vuitton Twist Bag (Cream)",
     category: "Bags",
+    image: null,
+    brand: "Louis Vuitton",
     description: null,
     retail: 11000,
     cost: 11000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -153,6 +169,8 @@ const PRODUCT_SEED = [
   {
     name: "Prada Patent Shoulder Bag",
     category: "Bags",
+    image: "img/products/prada-patent-shoulder-bag.jpg",
+    brand: "Prada",
     description: null,
     retail: 8500,
     cost: 8500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -163,6 +181,8 @@ const PRODUCT_SEED = [
   {
     name: "YSL Hobo Shoulder Bag",
     category: "Bags",
+    image: "img/products/ysl-hobo-shoulder-bag.jpg",
+    brand: "YSL",
     description: null,
     retail: 8500,
     cost: 8500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -173,6 +193,8 @@ const PRODUCT_SEED = [
   {
     name: "DG Belt",
     category: "Belts",
+    image: "img/products/dg-belt.jpg",
+    brand: "Dolce & Gabbana",
     description: null,
     retail: 7000,
     cost: 7000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -183,6 +205,8 @@ const PRODUCT_SEED = [
   {
     name: "Fendi Belt",
     category: "Belts",
+    image: "img/products/fendi-belt.jpg",
+    brand: "Fendi",
     description: null,
     retail: 3500,
     cost: 3500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -193,6 +217,8 @@ const PRODUCT_SEED = [
   {
     name: "Gucci Belt",
     category: "Belts",
+    image: "img/products/gucci-belt.jpg",
+    brand: "Gucci",
     description: null,
     retail: 7000,
     cost: 7000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -203,6 +229,8 @@ const PRODUCT_SEED = [
   {
     name: "Gucci Belt (Silver)",
     category: "Belts",
+    image: "img/products/gucci-belt-silver.jpg",
+    brand: "Gucci",
     description: null,
     retail: 2500,
     cost: 2500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -213,6 +241,8 @@ const PRODUCT_SEED = [
   {
     name: "Gucci Belt (Two-Tone)",
     category: "Belts",
+    image: "img/products/gucci-belt-two-tone.jpg",
+    brand: "Gucci",
     description: null,
     retail: 7000,
     cost: 7000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -223,6 +253,8 @@ const PRODUCT_SEED = [
   {
     name: "Loewe Belt",
     category: "Belts",
+    image: "img/products/loewe-belt.jpg",
+    brand: "Loewe",
     description: null,
     retail: 2500,
     cost: 2500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -234,6 +266,8 @@ const PRODUCT_SEED = [
   {
     name: "YSL Belt",
     category: "Belts",
+    image: "img/products/ysl-belt.jpg",
+    brand: "YSL",
     description: null,
     retail: 2500,
     cost: 2500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -245,6 +279,8 @@ const PRODUCT_SEED = [
   {
     name: "Brūmate Era Tumbler 40oz",
     category: "Drinkware",
+    image: "img/products/br-mate-era-tumbler-40oz.jpg",
+    brand: "Brūmate",
     description: "Hydration made stylish and effortless! 100% leakproof.",
     retail: 4000,
     cost: 4000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -259,6 +295,8 @@ const PRODUCT_SEED = [
   {
     name: "FlipStraw Stanley",
     category: "Drinkware",
+    image: "img/products/flipstraw-stanley.jpg",
+    brand: "Stanley",
     description: null,
     retail: 3000,
     cost: 3000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -274,6 +312,8 @@ const PRODUCT_SEED = [
   {
     name: "IceFlow Flip Straw 2.0 Tumbler 591ml",
     category: "Drinkware",
+    image: null,
+    brand: "Stanley",
     description: null,
     retail: 1500,
     cost: 1500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -289,6 +329,8 @@ const PRODUCT_SEED = [
   {
     name: "Owala SmoothSip® Slider 590Mls",
     category: "Drinkware",
+    image: "img/products/owala-smoothsip-slider-590mls.jpg",
+    brand: "Owala",
     description: "For all your hot and cold beverages, 590mls. Leakproof.",
     retail: 3000,
     cost: 3000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -304,6 +346,8 @@ const PRODUCT_SEED = [
   {
     name: "Stanley FlowState™ Quencher H2.0 Tumbler",
     category: "Drinkware",
+    image: "img/products/stanley-flowstate-quencher-h2-0-tumbler.jpg",
+    brand: "Stanley",
     description: "Double-wall vacuum-insulated stainless steel.",
     retail: 1500,
     cost: 1500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -316,6 +360,8 @@ const PRODUCT_SEED = [
   {
     name: "Stanley Quencher Tumbler",
     category: "Drinkware",
+    image: "img/products/stanley-quencher-tumbler.jpg",
+    brand: "Stanley",
     description: null,
     retail: 1500,
     cost: 1500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -335,6 +381,8 @@ const PRODUCT_SEED = [
   {
     name: "Stanley x Tyla Tyger 40oz Tumbler",
     category: "Drinkware",
+    image: null,
+    brand: "Stanley",
     description: null,
     retail: 1500,
     cost: 1500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -345,6 +393,8 @@ const PRODUCT_SEED = [
   {
     name: "The Quencher H2.0 FlowState Tumbler 414ml",
     category: "Drinkware",
+    image: null,
+    brand: "Stanley",
     description: null,
     retail: 1500,
     cost: 1500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -359,6 +409,8 @@ const PRODUCT_SEED = [
   {
     name: "Astronaut Galaxy Projector",
     category: "Electronics",
+    image: "img/products/astronaut-galaxy-projector.jpg",
+    brand: null,
     description: null,
     retail: 2000,
     cost: 2000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -369,6 +421,8 @@ const PRODUCT_SEED = [
   {
     name: "Kids Instant Print Camera",
     category: "Electronics",
+    image: "img/products/kids-instant-print-camera.jpg",
+    brand: null,
     description: "8GB storage capacity. Prints photos on the spot. Rechargeable battery.",
     retail: 3000,
     cost: 3000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -379,6 +433,8 @@ const PRODUCT_SEED = [
   {
     name: "Celine Bucket Hat",
     category: "Hats",
+    image: "img/products/celine-bucket-hat.jpg",
+    brand: "Celine",
     description: null,
     retail: 2000,
     cost: 2000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -390,6 +446,8 @@ const PRODUCT_SEED = [
   {
     name: "LV Monogram Bucket Hat",
     category: "Hats",
+    image: "img/products/lv-monogram-bucket-hat.jpg",
+    brand: "Louis Vuitton",
     description: null,
     retail: 2000,
     cost: 2000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -402,6 +460,8 @@ const PRODUCT_SEED = [
   {
     name: "Loewe Sun Hat",
     category: "Hats",
+    image: null,
+    brand: "Loewe",
     description: null,
     retail: 2000,
     cost: 2000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -412,6 +472,8 @@ const PRODUCT_SEED = [
   {
     name: "Prada Cap (Codro)",
     category: "Hats",
+    image: null,
+    brand: "Prada",
     description: null,
     retail: 3000,
     cost: 3000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -422,6 +484,8 @@ const PRODUCT_SEED = [
   {
     name: "Aokulasic Automatic Mechanical Watch",
     category: "Watches",
+    image: null,
+    brand: "Aokulasic",
     description: null,
     retail: 5000,
     cost: 5000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -434,6 +498,8 @@ const PRODUCT_SEED = [
   {
     name: "CAREKISO C124 Mechanical Watch",
     category: "Watches",
+    image: "img/products/carekiso-c124-mechanical-watch.jpg",
+    brand: "Carekiso",
     description: "A bold timepiece combining luxury styling with fascinating mechanics.",
     retail: 7000,
     cost: 7000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -447,6 +513,8 @@ const PRODUCT_SEED = [
   {
     name: "Carekiso Double Tourbillon",
     category: "Watches",
+    image: null,
+    brand: "Carekiso",
     description: null,
     retail: 8500,
     cost: 8500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -459,6 +527,8 @@ const PRODUCT_SEED = [
   {
     name: "Forsining Diamond Mechanical Watch",
     category: "Watches",
+    image: null,
+    brand: "Forsining",
     description: null,
     retail: 5000,
     cost: 5000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -470,6 +540,8 @@ const PRODUCT_SEED = [
   {
     name: "Forsining FG8 Automatic",
     category: "Watches",
+    image: null,
+    brand: "Forsining",
     description: null,
     retail: 5000,
     cost: 5000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -481,6 +553,8 @@ const PRODUCT_SEED = [
   {
     name: "Forsining Mechanical Watch",
     category: "Watches",
+    image: "img/products/forsining-mechanical-watch.jpg",
+    brand: "Forsining",
     description: null,
     retail: 6000,
     cost: 6000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -493,6 +567,8 @@ const PRODUCT_SEED = [
   {
     name: "Mark Fairwhale FW-625 Dual Tourbillon Automatic",
     category: "Watches",
+    image: null,
+    brand: "Mark Fairwhale",
     description: null,
     retail: 9500,
     cost: 9500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -504,6 +580,8 @@ const PRODUCT_SEED = [
   {
     name: "Mark Fairwhale FW6",
     category: "Watches",
+    image: null,
+    brand: "Mark Fairwhale",
     description: null,
     retail: 8000,
     cost: 8000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -515,6 +593,8 @@ const PRODUCT_SEED = [
   {
     name: "Men's Binbond Mechanical Watch",
     category: "Watches",
+    image: "img/products/men-s-binbond-mechanical-watch.jpg",
+    brand: "Binbond",
     description: "Striking forged-carbon-inspired design.",
     retail: 4000,
     cost: 4000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -528,6 +608,8 @@ const PRODUCT_SEED = [
   {
     name: "Men's Spinning Wheel Watch",
     category: "Watches",
+    image: "img/products/men-s-spinning-wheel-watch.jpg",
+    brand: null,
     description: "Perfect for car enthusiasts - unique 360° spinning wheel dial.",
     retail: 2500,
     cost: 2500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -539,6 +621,8 @@ const PRODUCT_SEED = [
   {
     name: "Men's Tevise Mechanical Watch",
     category: "Watches",
+    image: "img/products/men-s-tevise-mechanical-watch.jpg",
+    brand: "Tevise",
     description: "Men's luxury watch - wear it daily.",
     retail: 4000,
     cost: 4000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -551,6 +635,8 @@ const PRODUCT_SEED = [
   {
     name: "Men's Vintage Mechanical Watch",
     category: "Watches",
+    image: "img/products/men-s-vintage-mechanical-watch.jpg",
+    brand: null,
     description: "Men's luxury watch - wear it daily, it powers itself.",
     retail: 4000,
     cost: 4000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -562,6 +648,8 @@ const PRODUCT_SEED = [
   {
     name: "SKMEI Spinning Wheel Watch",
     category: "Watches",
+    image: null,
+    brand: "SKMEI",
     description: null,
     retail: 3500,
     cost: 3500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
@@ -579,6 +667,10 @@ function buildSeed() {
   const prices = [];
   const balances = [];
   const cost_history = [];
+  const categories = [...new Set(PRODUCT_SEED.map((p) => p.category).filter(Boolean))]
+    .sort()
+    .map((name) => ({ id: `cat-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, name }));
+  const categoryIdByName = Object.fromEntries(categories.map((c) => [c.name, c.id]));
 
   PRODUCT_SEED.forEach((p, i) => {
     const productId = `prod-${i + 1}`;
@@ -586,11 +678,12 @@ function buildSeed() {
       id: productId,
       name: p.name,
       description: p.description ?? null,
-      category_id: null,
+      category_id: categoryIdByName[p.category] ?? null,
       base_currency: 'USD',
       min_wholesale_qty: 6,
       is_active: true,
-      image_url: null,
+      image_url: p.image ?? null,
+      brand: p.brand ?? null,
     });
     prices.push({ product_id: productId, price_type: 'retail', unit_price_cents: p.retail, currency: 'USD', effective_date: '2026-01-01' });
     // Wholesale is optional -- the real catalog only supplies one price per product, so
@@ -644,6 +737,7 @@ function buildSeed() {
 
   return {
     products,
+    categories,
     variants,
     prices,
     balances,
@@ -762,6 +856,8 @@ function canSeeRow(table, row) {
 
 function tableRows(table) {
   switch (table) {
+    case 'categories':
+      return state.categories;
     case 'products':
       return state.products;
     case 'product_variants':
