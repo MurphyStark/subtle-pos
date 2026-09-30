@@ -9,7 +9,8 @@
 // catalog -- the bump also forces returning devices to drop the old cached product list.
 // v8: Tracy/Tanya/Admin accounts -- forces devices off the cached old login + mock.
 // v9: redesign phase 1 -- new shell/styles, icons.js + ui.js, brand mark and wordmark.
-const CACHE_NAME = 'subtle-pos-shell-v9';
+// v10: redesign phase 2 -- stock take wizard/history/report, product and variant pages.
+const CACHE_NAME = 'subtle-pos-shell-v10';
 const APP_SHELL = [
   './',
   './index.html',
@@ -23,6 +24,10 @@ const APP_SHELL = [
   './reports.html',
   './activity.html',
   './transfers.html',
+  './stock-takes.html',
+  './stock-take-report.html',
+  './product.html',
+  './variant.html',
   './manifest.webmanifest',
   './css/style.css',
   './js/config.js',
@@ -52,6 +57,11 @@ const APP_SHELL = [
   './js/transfers.js',
   './js/icons.js',
   './js/ui.js',
+  './js/catalog.js',
+  './js/stock-takes.js',
+  './js/stock-take-report.js',
+  './js/product.js',
+  './js/variant.js',
   './icons/favicon.png',
   './img/logo.png',
   './img/logo-wordmark.png',

@@ -75,7 +75,10 @@ export function renderNav(profile) {
   if (!nav) return;
   document.body.classList.add('has-shell');
 
-  const current = location.pathname.split('/').pop() || 'pos.html';
+  // Sub-pages light up their parent section.
+  const PARENT = { 'product.html': 'admin.html', 'variant.html': 'inventory.html', 'stock-takes.html': 'stock-take.html', 'stock-take-report.html': 'stock-take.html' };
+  const page = location.pathname.split('/').pop() || 'pos.html';
+  const current = PARENT[page] ?? page;
   const groupsHtml = NAV_GROUPS.map((group) => {
     const links = group.items
       .filter((item) => item.roles.includes(profile.role))
@@ -158,6 +161,7 @@ function wireMobileMenu() {
     scrim.className = 'nav-scrim';
     document.body.append(scrim);
   }
+  requestAnimationFrame(() => requestAnimationFrame(() => document.body.classList.add('nav-animate')));
   const close = () => document.body.classList.remove('nav-open');
   toggle.addEventListener('click', () => document.body.classList.toggle('nav-open'));
   scrim.addEventListener('click', close);

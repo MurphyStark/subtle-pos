@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Subtle POS — Stock Take History</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="icons/favicon.png" />
+  <link rel="apple-touch-icon" href="icons/favicon.png" />
+  <meta name="theme-color" content="#111111" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <nav id="app-nav"></nav>
+
+  <main>
+    <header class="page-header">
+      <div>
+        <h1>Stock Take History</h1>
+        <p class="page-subtitle">View past stock takes, compare results and track inventory accuracy.</p>
+      </div>
+      <div class="page-actions">
+        <a class="button primary" href="stock-take.html"><svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Start new stock take</a>
+      </div>
+    </header>
+
+    <div class="stat-grid" id="history-stats"></div>
+
+    <div class="split-layout">
+      <section class="card">
+        <div class="card-header">
+          <div><h2 class="card-title">Stock take records</h2><p class="card-subtitle">Every stock take, its status and key results.</p></div>
+        </div>
+        <div class="toolbar">
+          <label class="search"><svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input type="search" id="history-search" placeholder="Search by reference, date or counted by…" aria-label="Search stock takes" /></label>
+          <select id="history-status" aria-label="Status">
+            <option value="">All statuses</option>
+            <option value="completed">Completed</option>
+            <option value="draft">In progress</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Reference</th><th>Date &amp; time</th><th>Counted by</th><th id="history-location-head">Location</th><th class="num">Items</th><th>Variance</th><th>Status</th><th></th></tr></thead>
+            <tbody id="history-body"><tr><td colspan="8" class="muted">Loading…</td></tr></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="history-pagination"></div>
+      </section>
+      <aside class="split-side" id="history-side"></aside>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="js/stock-takes.js"></script>
+</body>
+</html>

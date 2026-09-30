@@ -24,41 +24,6 @@
       </div>
     </header>
 
-    <section class="card" id="add-product-panel" hidden style="margin-bottom: 16px;">
-      <div class="card-header">
-        <div>
-          <h2 class="card-title">Add a product</h2>
-          <p class="card-subtitle">Create the product first (name, price, cost, photo), then add its colour/size variants from its row below. A product isn't sellable until it has at least one variant.</p>
-        </div>
-      </div>
-      <form id="product-form" class="admin-form">
-        <div class="form-grid">
-          <label>Name <input type="text" name="name" required /></label>
-          <label>Category <select name="category_id"></select></label>
-          <label>Currency
-            <select name="currency">
-              <option value="USD">USD</option>
-              <option value="ZWG">ZWG</option>
-              <option value="ZAR">ZAR</option>
-            </select>
-          </label>
-          <label>Retail price <input type="number" name="retail_price" min="0" step="0.01" required placeholder="e.g. 30.00" /></label>
-          <label>Wholesale price (optional) <input type="number" name="wholesale_price" min="0" step="0.01" placeholder="e.g. 20.00" /></label>
-          <label>Min. wholesale qty <input type="number" name="min_wholesale_qty" min="1" step="1" value="6" /></label>
-          <label>Cost price (per unit) <input type="number" name="cost_price" min="0" step="0.01" required placeholder="e.g. 10.00" /></label>
-        </div>
-        <label>Description (optional) <textarea name="description" rows="3"></textarea></label>
-        <label>Product image <input type="file" name="photo" accept="image/*" /></label>
-        <div id="photo-preview"></div>
-        <div style="display: flex; gap: 10px; justify-content: flex-end;">
-          <button type="button" class="ghost" id="cancel-add-product">Cancel</button>
-          <button type="submit" class="primary">Add product</button>
-        </div>
-        <p class="error" id="product-error"></p>
-        <p class="success" id="product-success"></p>
-      </form>
-    </section>
-
     <section class="card">
       <div class="toolbar">
         <label class="search">
@@ -72,7 +37,7 @@
           <option value="low">Low stock</option>
           <option value="out">Out of stock</option>
         </select>
-        <button type="button" class="primary" id="toggle-add-product" style="height: 46px;"><svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Add product</button>
+        <a class="button primary" href="product.html" style="height: 46px;"><svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Add product</a>
       </div>
       <div class="table-wrap">
         <table>
@@ -124,7 +89,6 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
   <script type="module" src="js/admin.js"></script>
 </body>
 </html>

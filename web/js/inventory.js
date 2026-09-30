@@ -170,9 +170,9 @@ function renderRows() {
       .map((r) => {
         const variantLabel = [r.variant.size, r.variant.color].filter(Boolean).join(' / ') || '—';
         return `
-        <tr class="${r.needsReview ? 'needs-review' : ''}">
+        <tr class="product-row${r.needsReview ? ' needs-review' : ''}" data-id="${r.variant.id}">
           <td class="muted nowrap">${r.variant.sku ?? '—'}</td>
-          <td><div class="cell-product">${thumb(r.product?.image_url, '', 'sm')}<span class="name">${r.product?.name ?? 'Unknown product'}</span></div></td>
+          <td><a class="cell-product" href="variant.html?id=${r.variant.id}">${thumb(r.product?.image_url, '', 'sm')}<span class="name">${r.product?.name ?? 'Unknown product'}</span></a></td>
           <td class="muted">${variantLabel}</td>
           ${locations.map((l) => `<td class="num">${r.qty[l.id] ?? 0}</td>`).join('')}
           ${locations.length > 1 ? `<td class="num"><strong>${r.total}</strong></td>` : ''}
@@ -182,6 +182,13 @@ function renderRows() {
         </tr>`;
       })
       .join('') || `<tr><td colspan="${colspan}" class="muted" style="text-align: center; padding: 32px;">No variants match these filters.</td></tr>`;
+
+  document.querySelectorAll('#inventory-body .product-row').forEach((row) =>
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('a')) return;
+      location.href = `variant.html?id=${row.dataset.id}`;
+    })
+  );
 }
 
 function exportCsv() {
