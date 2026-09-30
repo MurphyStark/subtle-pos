@@ -3,12 +3,11 @@ import { getClient } from './supabaseClient.js';
 import { formatCents, toCents } from './money.js';
 import { renderNav } from './nav.js';
 import { registerServiceWorker } from './pwa.js';
-import { resizeImage } from './image.js';
 import { printLabels } from './labels.js';
 import { logActivity } from './activity.js';
 import { icon } from './icons.js';
 import { thumb, stockStatus, stockPill } from './ui.js';
-import { loadCatalog, variantLabel, getOrCreateManualSupplier, receiveStock } from './catalog.js';
+import { loadCatalog, variantLabel, getOrCreateManualSupplier, receiveStock, uploadProductPhoto } from './catalog.js';
 
 // Add a product (product.html) or edit one (product.html?id=...). Managers/owner/admin only.
 //
@@ -304,14 +303,6 @@ async function archiveProduct() {
 }
 
 // ---------- save ----------
-async function uploadProductPhoto(client, file, productId) {
-  const blob = await resizeImage(file);
-  const path = `${productId}.jpg`;
-  const { error } = await client.storage.from('product-images').upload(path, blob, { upsert: true, contentType: 'image/jpeg' });
-  if (error) throw new Error(error.message);
-  return client.storage.from('product-images').getPublicUrl(path).data.publicUrl;
-}
-
 function validate(f) {
   const problems = [];
   if (!f.name.value.trim()) problems.push([f.name, 'Enter a product name.']);
@@ -365,7 +356,7 @@ async function save(event) {
         currency,
         effective_date: now,
       });
-      if (pendingImage) await client.from('products').update({ image_url: await uploadProductPhoto(client, pendingImage, productId) }).eq('id', productId);
+      if (pendingImage) await uploadProductPhoto(client, pendingImage, productId);
       const created = { id: productId, name: fields.name };
       for (const v of draftVariants) await createVariant(client, created, v);
       await logActivity(profile, 'product_created', `${profile.full_name} created product "${fields.name}"`, { product_id: productId });
@@ -396,7 +387,7 @@ async function save(event) {
         changes.push('cost price');
       }
     }
-    if (pendingImage) await client.from('products').update({ image_url: await uploadProductPhoto(client, pendingImage, product.id) }).eq('id', product.id);
+    if (pendingImage) await uploadProductPhoto(client, pendingImage, product.id);
     else if (removeImage) await client.from('products').update({ image_url: null }).eq('id', product.id);
 
     await logActivity(profile, 'product_updated', `${profile.full_name} updated "${fields.name}"${changes.length ? ` (${changes.join(', ')})` : ''}`, { product_id: product.id });
