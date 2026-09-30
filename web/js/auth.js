@@ -11,12 +11,12 @@ export async function getCurrentProfile() {
 
   const { data: profile, error } = await client
     .from('user_profiles')
-    .select('id, full_name, role, primary_location_id, manager_pin, last_seen_at')
+    .select('id, full_name, role, primary_location_id, manager_pin, last_seen_at, avatar_url, job_title, phone, alt_phone, created_at')
     .eq('id', session.user.id)
     .single();
 
   if (error || !profile) return null;
-  return { session, profile };
+  return { session, profile: { ...profile, email: session.user.email ?? null } };
 }
 
 // Call at the top of every page (except index.html). Redirects to login if not

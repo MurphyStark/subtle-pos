@@ -6,7 +6,7 @@ import { registerServiceWorker } from './pwa.js';
 import { logActivity } from './activity.js';
 import { icon } from './icons.js';
 import { thumb, stockStatus, stockPill, renderPagination } from './ui.js';
-import { loadCatalog } from './catalog.js';
+import { loadCatalog, uploadProductPhoto } from './catalog.js';
 
 // Products list (plus, until Settings exists, discount codes and the manager PIN).
 // Manager/owner only -- RLS enforces this independently (products/product_variants/
@@ -58,14 +58,23 @@ async function init() {
   document.getElementById('discount-code-form').addEventListener('submit', handleCreateDiscountCode);
   document.getElementById('pin-form').addEventListener('submit', handleSetManagerPin);
 
+  updatePhotoNotice();
   drawProductTable();
   await renderDiscountCodesList();
+}
+
+// "N products have no photo yet" with a one-click filter to list just those.
+function updatePhotoNotice() {
+  const missing = products.filter((p) => !p.image_url).length;
+  const notice = document.getElementById('photo-notice');
+  notice.hidden = missing === 0;
+  notice.querySelector('span').textContent = `${missing} product${missing === 1 ? ' has' : 's have'} no photo yet. Tap "Add photo" on a row to upload one.`;
 }
 
 function drawProductTable() {
   const filtered = products.filter((p) => {
     if (view.category && p.category_id !== view.category) return false;
-    if (view.status && p.status !== view.status) return false;
+    if (view.status === 'nophoto' ? p.image_url : view.status && p.status !== view.status) return false;
     if (!view.term) return true;
     return p.name.toLowerCase().includes(view.term) || (p.brand ?? '').toLowerCase().includes(view.term) || p.variants.some((v) => (v.sku ?? '').toLowerCase().includes(view.term) || (v.barcode ?? '') === view.term);
   });
@@ -87,7 +96,11 @@ function drawProductTable() {
       .map(
         (p) => `
         <tr class="product-row" data-id="${p.id}">
-          <td><a class="cell-product" href="product.html?id=${p.id}">${thumb(p.image_url, '', 'md')}<span><span class="name">${p.name}</span>${p.brand ? `<span class="sub">${p.brand}</span>` : ''}</span></a></td>
+          <td><div class="cell-product">${
+            p.image_url
+              ? thumb(p.image_url, '', 'md')
+              : `<label class="thumb thumb-md thumb-upload" title="Add a photo" aria-label="Add a photo for ${p.name}">${icon('image', { size: 16 })}<span>Add photo</span><input type="file" accept="image/*" class="visually-hidden" data-photo-for="${p.id}" /></label>`
+          }<a href="product.html?id=${p.id}" class="product-link"><span class="name">${p.name}</span>${p.brand ? `<span class="sub">${p.brand}</span>` : ''}</a></div></td>
           <td class="muted">${p.categoryName || '—'}</td>
           <td>${p.variants.length}</td>
           <td class="muted nowrap">${p.variants[0]?.sku ?? '—'}</td>
@@ -99,9 +112,30 @@ function drawProductTable() {
       )
       .join('') || '<tr><td colspan="8" class="muted" style="text-align: center; padding: 32px;">No products match these filters.</td></tr>';
 
+  tbody.querySelectorAll('input[data-photo-for]').forEach((input) =>
+    input.addEventListener('change', async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const label = input.closest('label');
+      label.classList.add('is-busy');
+      label.querySelector('span').textContent = 'Uploading…';
+      try {
+        const product = products.find((p) => p.id === input.dataset.photoFor);
+        product.image_url = await uploadProductPhoto(getClient(), file, product.id);
+        await logActivity(profile, 'product_updated', `${profile.full_name} added a photo for "${product.name}"`, { product_id: product.id });
+        updatePhotoNotice();
+        drawProductTable();
+      } catch (err) {
+        label.classList.remove('is-busy');
+        label.querySelector('span').textContent = 'Try again';
+        label.title = err.message ?? 'Upload failed';
+      }
+    })
+  );
+
   tbody.querySelectorAll('.product-row').forEach((row) => {
     row.addEventListener('click', (e) => {
-      if (e.target.closest('a')) return;
+      if (e.target.closest('a, label, input')) return;
       location.href = `product.html?id=${row.dataset.id}`;
     });
   });
@@ -225,3 +259,9 @@ async function handleSetManagerPin(event) {
 }
 
 init();
+
+document.getElementById('show-missing-photos')?.addEventListener('click', () => {
+  const select = document.getElementById('filter-status');
+  select.value = 'nophoto';
+  select.dispatchEvent(new Event('change'));
+});

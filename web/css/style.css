@@ -608,6 +608,61 @@ a.cell-product:hover .name { text-decoration: underline; }
 .action-tile.tone-blue-soft { color: var(--info); }
 .action-tile:hover, .action-tile.active { border-color: currentColor; }
 
+/* ---------- my profile + photos ---------- */
+.avatar.has-photo { background: #ddd; overflow: hidden; padding: 0; }
+.avatar.has-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar-link { display: inline-flex; border-radius: 50%; }
+.avatar-link:focus-visible, .nav-user-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.nav-user-link { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; color: inherit; text-decoration: none; border-radius: 8px; padding: 4px; margin: -4px; }
+.nav-user-link:hover { background: rgba(255, 255, 255, 0.07); }
+.avatar-xl { width: 116px; height: 116px; font-size: 38px; }
+
+.profile-hero {
+  position: relative; display: flex; align-items: center; gap: 26px; padding: 28px;
+  border-radius: var(--radius-lg); background: linear-gradient(120deg, #fdebd3 0%, #fbf3dc 60%, #fff 100%);
+  border: 1px solid var(--border);
+}
+.profile-photo { position: relative; flex-shrink: 0; }
+.photo-btn {
+  position: absolute; right: 2px; bottom: 2px; width: 38px; height: 38px; border-radius: 50%;
+  background: #fff; color: var(--text); display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: var(--shadow-md); cursor: pointer; border: 1px solid var(--border);
+}
+.photo-btn:hover { background: var(--surface-muted); }
+.photo-btn:focus-within, .photo-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.profile-hero-text h2 { margin: 0; font-size: 26px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.profile-hero-text p { margin: 4px 0 0; color: var(--text-muted); font-size: 15.5px; }
+.profile-hero-text .link-danger { margin-top: 8px; }
+.profile-hero-hint { position: absolute; right: 20px; bottom: 14px; margin: 0; font-size: 12.5px; color: var(--text-muted); }
+@media (max-width: 640px) { .profile-hero { flex-direction: column; text-align: center; } .profile-hero-text h2 { justify-content: center; } .profile-hero-hint { position: static; } }
+.with-icon { display: flex; gap: 14px; align-items: center; }
+.with-icon .stat-icon { width: 48px; height: 48px; }
+fieldset { border: none; margin: 0; padding: 0; min-width: 0; }
+fieldset:disabled input { background: var(--surface-muted); color: var(--text); }
+input[readonly] { background: var(--surface-muted); color: var(--text-muted); }
+.kv-list { margin: 0; }
+.kv-list > div { display: flex; justify-content: space-between; gap: 12px; padding: 11px 0; border-top: 1px solid var(--border); font-size: 14.5px; }
+.kv-list > div:first-child { border-top: none; }
+.kv-list dt { color: var(--text-muted); }
+.kv-list dd { margin: 0; font-weight: 500; text-align: right; overflow-wrap: anywhere; }
+.password-field { position: relative; display: block; }
+.password-field input { width: 100%; padding-right: 44px; }
+.eye-btn { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); border: none; background: transparent; padding: 8px; color: var(--text-muted); }
+.eye-btn:active:not(:disabled) { transform: translateY(-50%); }
+
+.thumb-upload {
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  border: 1.5px dashed var(--brand); background: var(--brand-soft); color: var(--brand-strong); cursor: pointer;
+  font-size: 9.5px; font-weight: 600; line-height: 1.1; text-align: center;
+}
+.thumb-upload:hover { background: #f7e7b8; }
+.thumb-upload:focus-within { outline: 2px solid var(--brand); outline-offset: 2px; }
+.thumb-upload.is-busy { opacity: 0.6; pointer-events: none; }
+.product-link { color: inherit; text-decoration: none; }
+.product-link:hover .name { text-decoration: underline; }
+.product-link .name, .product-link .sub { display: block; }
+.photo-notice { justify-content: space-between; align-items: center; margin-bottom: 14px; }
+
 /* ---------- receipt (printed) ---------- */
 .receipt-paper {
   background: white; color: #1c1c1a; width: 100%; max-width: 340px;

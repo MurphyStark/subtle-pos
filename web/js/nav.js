@@ -70,13 +70,20 @@ export function initials(name) {
     .join('');
 }
 
+// A person's photo if they've uploaded one, otherwise their initials.
+export function avatar(profile, className = 'avatar') {
+  return profile.avatar_url
+    ? `<span class="${className} has-photo"><img src="${profile.avatar_url}" alt="" /></span>`
+    : `<span class="${className}">${initials(profile.full_name)}</span>`;
+}
+
 export function renderNav(profile) {
   const nav = document.getElementById('app-nav');
   if (!nav) return;
   document.body.classList.add('has-shell');
 
   // Sub-pages light up their parent section.
-  const PARENT = { 'product.html': 'admin.html', 'variant.html': 'inventory.html', 'stock-takes.html': 'stock-take.html', 'stock-take-report.html': 'stock-take.html' };
+  const PARENT = { 'profile.html': null, 'product.html': 'admin.html', 'variant.html': 'inventory.html', 'stock-takes.html': 'stock-take.html', 'stock-take-report.html': 'stock-take.html' };
   const page = location.pathname.split('/').pop() || 'pos.html';
   const current = PARENT[page] ?? page;
   const groupsHtml = NAV_GROUPS.map((group) => {
@@ -103,11 +110,13 @@ export function renderNav(profile) {
     </a>
     <div class="nav-links">${groupsHtml}</div>
     <div class="nav-user">
-      <span class="avatar">${initials(profile.full_name)}</span>
-      <span class="nav-user-text">
-        <span class="nav-user-name">${profile.full_name}</span>
-        <span class="nav-user-role">${roleLabel(profile.role)}</span>
-      </span>
+      <a class="nav-user-link" href="profile.html" title="My profile">
+        ${avatar(profile)}
+        <span class="nav-user-text">
+          <span class="nav-user-name">${profile.full_name}</span>
+          <span class="nav-user-role">${roleLabel(profile.role)}</span>
+        </span>
+      </a>
       <button id="nav-signout" type="button" class="icon-btn" title="Sign out" aria-label="Sign out">${icon('logout', { size: 18 })}</button>
     </div>
   `;
@@ -140,7 +149,7 @@ async function renderTopbarTools(profile) {
   tools.className = 'topbar-tools';
   tools.innerHTML = `
     <span class="location-chip">${icon('pin', { size: 18 })}<span id="topbar-location">…</span></span>
-    <span class="avatar" title="${profile.full_name} · ${roleLabel(profile.role)}">${initials(profile.full_name)}</span>
+    <a class="avatar-link" href="profile.html" title="My profile · ${profile.full_name}" aria-label="My profile">${avatar(profile)}</a>
   `;
   header.append(tools);
 
@@ -154,7 +163,8 @@ async function renderTopbarTools(profile) {
 
 function wireMobileMenu() {
   const toggle = document.querySelector('.menu-toggle');
-  if (!toggle) return;
+  if (!toggle || toggle.dataset.wired) return; // renderNav can run again (e.g. after a profile edit)
+  toggle.dataset.wired = '1';
   let scrim = document.querySelector('.nav-scrim');
   if (!scrim) {
     scrim = document.createElement('div');

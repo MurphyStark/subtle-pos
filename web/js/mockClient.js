@@ -17,11 +17,12 @@
 // with an existing demo session (still on the old placeholder products in localStorage)
 // gets reseeded automatically instead of staying stuck on stale sample data.
 // v5: full 107-variant catalog (WhatsApp + photos + price list) and the Warehouse location.
+// v9: profile fields (photo, job title, phones) for My Profile.
 // v8: product brands (redesign phase 2).
 // v7: product photos + categories (redesign phase 1).
 // v6: accounts are now Tracy (owner), Tanya (cashier) and Admin -- user_profiles is seeded
 // from DEMO_ACCOUNTS, so the old demo people must be reseeded away.
-const STATE_KEY = 'subtle-pos-demo-state-v8';
+const STATE_KEY = 'subtle-pos-demo-state-v9';
 const SESSION_KEY = 'subtle-pos-demo-session-v1';
 
 // Two locations: the shop everyone sells from, and a Warehouse that only the ADMIN can see
@@ -754,7 +755,7 @@ function buildSeed() {
     purchase_orders: [],
     purchase_order_items: [],
     inventory_transfers: [],
-    user_profiles: DEMO_ACCOUNTS.map(({ passwordSha256, hiddenFromQuickLogin, ...a }) => ({ ...a, manager_pin: DEMO_MANAGER_PINS[a.id] ?? null, last_seen_at: null })),
+    user_profiles: DEMO_ACCOUNTS.map(({ passwordSha256, hiddenFromQuickLogin, ...a }) => ({ ...a, created_at: '2025-08-01T08:00:00.000Z', avatar_url: null, job_title: { owner: 'Shop Owner', cashier: 'Cashier', admin: 'Administrator' }[a.role] ?? null, phone: null, alt_phone: null, manager_pin: DEMO_MANAGER_PINS[a.id] ?? null, last_seen_at: null })),
     app_settings: [{ key: 'manual_discount_cap_cents', value: 2000, updated_at: new Date().toISOString() }],
     discount_codes: [
       {
@@ -1240,10 +1241,15 @@ export function createMockClient() {
       },
       async getSession() {
         const user = loadSession();
-        return { data: { session: user ? { user: { id: user.id } } : null } };
+        return { data: { session: user ? { user: { id: user.id, email: user.email } } : null } };
       },
       async signOut() {
         saveSession(null);
+      },
+      // Passwords aren't stored in demo mode (any password works for Tracy and Tanya, and
+      // the Admin's is fixed in DEMO_ACCOUNTS), so there's nothing to change yet.
+      async updateUser() {
+        return { data: null, error: { message: 'Password changes work once the real database is connected. Demo mode has no stored passwords to change.' } };
       },
     },
     from(table) {
@@ -1261,6 +1267,30 @@ export function createMockClient() {
             )
           : null;
         return { data: match ? match.id : null, error: null };
+      }
+      // Mirror the my_profile migration's self-service functions: they only ever touch the
+      // caller's own row, and only the allowed columns.
+      const me = state.user_profiles.find((u) => u.id === loadSession()?.id);
+      if (fnName === 'update_my_profile') {
+        if (!me) return { data: null, error: { message: 'Not signed in' } };
+        if (!String(params.p_full_name ?? '').trim()) return { data: null, error: { message: 'Full name is required' } };
+        const clean = (v) => (String(v ?? '').trim() || null);
+        Object.assign(me, { full_name: params.p_full_name.trim(), job_title: clean(params.p_job_title), phone: clean(params.p_phone), alt_phone: clean(params.p_alt_phone) });
+        saveState(state);
+        return { data: null, error: null };
+      }
+      if (fnName === 'set_my_avatar') {
+        if (!me) return { data: null, error: { message: 'Not signed in' } };
+        me.avatar_url = params.p_avatar_url || null;
+        saveState(state);
+        return { data: null, error: null };
+      }
+      if (fnName === 'touch_my_presence') {
+        if (me) {
+          me.last_seen_at = new Date().toISOString();
+          saveState(state);
+        }
+        return { data: null, error: null };
       }
       return { data: null, error: { message: `Unknown RPC function in demo mode: ${fnName}` } };
     },

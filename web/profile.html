@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Subtle POS — My Profile</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="icons/favicon.png" />
+  <link rel="apple-touch-icon" href="icons/favicon.png" />
+  <meta name="theme-color" content="#111111" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <nav id="app-nav"></nav>
+
+  <main>
+    <header class="page-header">
+      <div>
+        <h1>My Profile</h1>
+        <p class="page-subtitle">Manage your personal information, photo and password.</p>
+      </div>
+    </header>
+
+    <div class="split-layout wide-side">
+      <div class="stack">
+        <section class="profile-hero" aria-label="Profile">
+          <div class="profile-photo">
+            <span id="hero-avatar"></span>
+            <label class="photo-btn" for="avatar-input" title="Upload a new photo" aria-label="Upload a new profile photo"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg></label>
+            <input type="file" id="avatar-input" accept="image/*" class="visually-hidden" />
+          </div>
+          <div class="profile-hero-text">
+            <h2><span id="hero-name"></span> <span class="pill pill-warning" id="hero-role"></span></h2>
+            <p id="hero-email"></p>
+            <p id="hero-phone"></p>
+            <button type="button" class="link-danger" id="remove-avatar" hidden>Remove photo</button>
+            <p class="error" id="avatar-error"></p>
+          </div>
+          <p class="profile-hero-hint">JPG or PNG. It's resized automatically.</p>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <div class="with-icon"><span class="stat-icon tone-neutral"><svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+              <div><h2 class="card-title">Personal information</h2><p class="card-subtitle">Update your personal details and contact information.</p></div></div>
+            <button type="button" class="ghost" id="edit-btn"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg> Edit</button>
+          </div>
+          <form id="profile-form" class="admin-form" novalidate>
+            <fieldset id="profile-fields" disabled>
+              <div class="form-grid two">
+                <label><span>Full name <span class="req">*</span></span><input type="text" name="full_name" required autocomplete="name" /></label>
+                <label>Job title<input type="text" name="job_title" placeholder="e.g. Store Owner" /></label>
+                <label>Email address<input type="email" name="email" readonly title="Your sign-in email" /></label>
+                <label>Role<input type="text" name="role" readonly /></label>
+                <label>Phone number<input type="tel" name="phone" placeholder="+263 77 123 4567" autocomplete="tel" /></label>
+                <label>Alternate phone number<input type="tel" name="alt_phone" placeholder="optional" /></label>
+              </div>
+            </fieldset>
+            <p class="muted" style="font-size: 13px; margin: 0;">Your email and role are set by the shop owner or admin.</p>
+            <div class="inline-form-actions" id="profile-actions" hidden>
+              <button type="button" class="ghost" id="cancel-edit">Cancel</button>
+              <button type="submit" class="primary">Save changes</button>
+            </div>
+            <p class="error" id="profile-error"></p>
+            <p class="success" id="profile-success" role="status"></p>
+          </form>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <div class="with-icon"><span class="stat-icon tone-neutral"><svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+              <div><h2 class="card-title">Change password</h2><p class="card-subtitle">Keep your account secure with a strong password.</p></div></div>
+          </div>
+          <form id="password-form" class="admin-form" novalidate>
+            <input type="email" name="username" autocomplete="username" class="visually-hidden" tabindex="-1" aria-hidden="true" />
+            <div class="form-grid">
+              <label><span>Current password</span><span class="password-field"><input type="password" name="current_password" autocomplete="current-password" /><button type="button" class="eye-btn" aria-label="Show password" data-toggle="current_password"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></span></label>
+              <label><span>New password</span><span class="password-field"><input type="password" name="new_password" autocomplete="new-password" /><button type="button" class="eye-btn" aria-label="Show password" data-toggle="new_password"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></span></label>
+              <label><span>Confirm new password</span><span class="password-field"><input type="password" name="confirm_password" autocomplete="new-password" /><button type="button" class="eye-btn" aria-label="Show password" data-toggle="confirm_password"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></span></label>
+            </div>
+            <div class="callout info">Use at least 8 characters with a mix of letters, numbers and symbols.</div>
+            <div><button type="submit" class="ghost">Change password</button></div>
+            <p class="error" id="password-error"></p>
+            <p class="success" id="password-success" role="status"></p>
+          </form>
+        </section>
+      </div>
+
+      <aside class="stack">
+        <section class="card">
+          <h2 class="card-title">Profile summary</h2>
+          <p class="card-subtitle" style="margin-bottom: 10px;">Quick overview of your account.</p>
+          <dl class="kv-list" id="summary"></dl>
+        </section>
+        <section class="card" id="activity-card">
+          <div class="card-header" style="margin-bottom: 8px;">
+            <div><h2 class="card-title">Recent activity</h2><p class="card-subtitle">Your latest actions.</p></div>
+          </div>
+          <ul class="timeline" id="my-activity"></ul>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="js/profile.js"></script>
+</body>
+</html>

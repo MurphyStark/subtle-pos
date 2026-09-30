@@ -11,7 +11,8 @@
 // v9: redesign phase 1 -- new shell/styles, icons.js + ui.js, brand mark and wordmark.
 // v10: redesign phase 2 -- stock take wizard/history/report, product and variant pages.
 // v11: network-first fetch so a new deploy shows up on the next load.
-const CACHE_NAME = 'subtle-pos-shell-v11';
+// v12: My Profile page.
+const CACHE_NAME = 'subtle-pos-shell-v12';
 const APP_SHELL = [
   './',
   './index.html',
@@ -29,6 +30,7 @@ const APP_SHELL = [
   './stock-take-report.html',
   './product.html',
   './variant.html',
+  './profile.html',
   './manifest.webmanifest',
   './css/style.css',
   './js/config.js',
@@ -63,6 +65,7 @@ const APP_SHELL = [
   './js/stock-take-report.js',
   './js/product.js',
   './js/variant.js',
+  './js/profile.js',
   './icons/favicon.png',
   './img/logo.png',
   './img/logo-wordmark.png',
