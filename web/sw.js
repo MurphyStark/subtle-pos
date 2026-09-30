@@ -10,7 +10,8 @@
 // v8: Tracy/Tanya/Admin accounts -- forces devices off the cached old login + mock.
 // v9: redesign phase 1 -- new shell/styles, icons.js + ui.js, brand mark and wordmark.
 // v10: redesign phase 2 -- stock take wizard/history/report, product and variant pages.
-const CACHE_NAME = 'subtle-pos-shell-v10';
+// v11: network-first fetch so a new deploy shows up on the next load.
+const CACHE_NAME = 'subtle-pos-shell-v11';
 const APP_SHELL = [
   './',
   './index.html',
@@ -86,18 +87,18 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return; // let Supabase/CDN requests pass through untouched
 
+  // Network first, cache as the offline fallback: when online you always get the latest
+  // deploy (a cache-first shell kept showing the previous version after an update until a
+  // second reload); when offline the last good copy is served.
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const network = fetch(event.request)
-        .then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
+    fetch(event.request)
+      .then((response) => {
+        if (response.ok && event.request.method === 'GET') {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request).then((cached) => cached ?? Response.error()))
   );
 });
