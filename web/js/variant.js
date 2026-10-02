@@ -168,7 +168,9 @@ function render() {
 
   document.getElementById('variant-stats').innerHTML = [
     statCard({ label: 'Current stock', value: total, sub: 'units', iconName: 'box', tone: 'blue' }),
-    statCard({ label: 'Average unit cost', value: avgCost != null ? formatCents(avgCost, currency) : '—', iconName: 'trend', tone: 'green' }),
+    product.costSet
+      ? statCard({ label: 'Average unit cost', value: avgCost != null ? formatCents(avgCost, currency) : '—', iconName: 'trend', tone: 'green' })
+      : statCard({ label: 'Average unit cost', value: 'Not set', sub: 'Enter it on the product', iconName: 'trend', tone: 'green' }),
     statCard({ label: 'Retail price', value: product.retail ? formatCents(product.retail.unit_price_cents, currency) : '—', iconName: 'tag', tone: 'amber' }),
     statCard({ label: 'Low stock level', value: variant.reorder_threshold ?? DEFAULT_LOW_STOCK, sub: 'units', iconName: 'alert', tone: 'purple' }),
   ].join('');
@@ -271,7 +273,7 @@ function openAction(kind) {
   const fields = {
     add: `${locationSelect}
       <label>Quantity to add<input type="number" data-f="qty" min="1" step="1" value="1" /></label>
-      <label>Unit cost<input type="number" data-f="cost" min="0" step="0.01" value="${product.cost ? (product.cost.unit_cost_cents / 100).toFixed(2) : ''}" /></label>
+      <label>Unit cost<input type="number" data-f="cost" min="0" step="0.01" value="${product.costSet ? (product.cost.unit_cost_cents / 100).toFixed(2) : ''}" placeholder="${product.costSet ? '' : 'Cost not set yet'}" /></label>
       <label>Note<input type="text" data-f="note" placeholder="e.g. New delivery" /></label>`,
     remove: `${locationSelect}
       <label>Quantity to remove<input type="number" data-f="qty" min="1" step="1" value="1" /></label>

@@ -70,6 +70,8 @@ export async function loadCatalog(client) {
       retail: latestPrice[`${p.id}:retail`] ?? null,
       wholesale: latestPrice[`${p.id}:wholesale`] ?? null,
       cost: latestCost[p.id] ?? null, // null for roles that can't read cost history
+      // false while the only cost is a stand-in (placeholder_costs migration) -- show "Not set"
+      costSet: Boolean(latestCost[p.id] && !latestCost[p.id].is_placeholder),
       variants: (variantsByProduct[p.id] ?? []).sort((a, b) => (a.sku ?? '').localeCompare(b.sku ?? '')),
     };
   }

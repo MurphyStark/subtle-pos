@@ -135,7 +135,7 @@ body.has-shell main { margin-left: var(--sidebar-w); max-width: none; }
   .menu-toggle { display: inline-flex; }
   .page-header { flex-wrap: wrap; }
   .page-header h1 { font-size: 24px; }
-  .location-chip span:last-child { max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+  .location-chip span:last-child { max-width: 190px; overflow: hidden; text-overflow: ellipsis; }
 }
 @media (max-width: 560px) {
   .topbar-tools .location-chip { display: none; }
@@ -158,7 +158,9 @@ h1 { font-size: 22px; margin: 0 0 12px; letter-spacing: -0.01em; }
 h2 { font-size: 17px; margin: 0 0 10px; }
 .section-title { font-size: 19px; font-weight: 700; margin: 28px 0 12px; }
 
-.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin-bottom: 20px; }
+.stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px; }
+@media (max-width: 1280px) { .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .stat-grid { grid-template-columns: minmax(0, 1fr); } }
 .stat-card {
   display: flex; align-items: center; gap: 16px;
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
@@ -193,6 +195,10 @@ tr.needs-review td { background: #fff8eb; }
 tr.expanded-row > td { background: var(--surface-muted); padding: 18px 20px; }
 
 .thumb { border-radius: 8px; object-fit: cover; background: var(--surface-muted); border: 1px solid var(--border); flex-shrink: 0; }
+/* photos fade in over a soft placeholder instead of popping in on slow connections */
+img.thumb { background: linear-gradient(110deg, #f1f1ee 30%, #f8f8f6 50%, #f1f1ee 70%) 0 0 / 200% 100%; animation: thumb-shimmer 1.4s linear infinite; opacity: 0.001; transition: opacity 220ms ease; }
+img.thumb.is-loaded { opacity: 1; animation: none; background: var(--surface-muted); }
+@keyframes thumb-shimmer { to { background-position: -200% 0; } }
 .thumb-sm { width: 36px; height: 36px; }
 .thumb-md { width: 48px; height: 48px; }
 .thumb-lg { width: 100%; aspect-ratio: 1; height: auto; }
@@ -302,6 +308,9 @@ button.lg { padding: 13px 20px; font-size: 16px; }
 main.login-shell { max-width: none; margin: 0; }
 .login-subtitle { margin: 0 0 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); }
 .demo-account-btn { width: 100%; justify-content: flex-start; }
+.demo-data-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.demo-data-actions button { font-size: 13px; padding: 8px; }
+.demo-data-note { font-size: 13px; color: var(--success); margin: 8px 0 0; min-height: 1em; }
 
 /* ---------- checkout ---------- */
 .pos-layout { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 20px; align-items: start; }
@@ -586,7 +595,8 @@ a.cell-product:hover .name { text-decoration: underline; }
 .attr-grid dt { color: var(--text-muted); font-size: 13.5px; }
 .attr-grid dd { margin: 2px 0 0; font-weight: 500; }
 @media (max-width: 640px) { .variant-hero { grid-template-columns: 1fr; } .variant-hero .thumb-lg { max-width: 200px; } .attr-grid { grid-template-columns: 1fr 1fr; } }
-.stat-grid.compact { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 0; gap: 12px; }
+.stat-grid.compact { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 0; gap: 12px; }
+@media (max-width: 1440px) { .stat-grid.compact { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .stat-grid.compact .stat-card { padding: 14px; gap: 12px; box-shadow: none; }
 .stat-grid.compact .stat-icon { width: 44px; height: 44px; }
 .stat-grid.compact .stat-value { font-size: 22px; }

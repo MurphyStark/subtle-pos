@@ -31,6 +31,34 @@ let products = [];
 let variants = [];
 let granularity = 'daily';
 
+// Dates as the shop sees them. toISOString() is UTC, so in Harare (UTC+2) local midnight
+// came out as 22:00 the previous day -- "This month" started on the last day of the
+// previous month and sales landed on the wrong day.
+export function localISODate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// A sale made while its product's cost was only a stand-in (product_cost_history
+// .is_placeholder) has no real profit figure. Those lines get profit/COGS = null and
+// costUnknown = true, so the totals below skip them and say so instead of showing $0.
+function markUnknownCosts(items, costRows) {
+  const variantProduct = Object.fromEntries(variants.map((v) => [v.id, v.product_id]));
+  const saleAt = Object.fromEntries(sales.map((s) => [s.id, s.created_at]));
+  const byProduct = {};
+  for (const c of costRows ?? []) (byProduct[c.product_id] ??= []).push(c);
+  for (const list of Object.values(byProduct)) list.sort((a, b) => (a.effective_date < b.effective_date ? 1 : -1));
+  return items.map((item) => {
+    const at = saleAt[item.sale_id];
+    const inEffect = (byProduct[variantProduct[item.variant_id]] ?? []).find((c) => c.effective_date <= at);
+    return inEffect?.is_placeholder ? { ...item, gross_profit_cents: null, cost_of_goods_sold_cents: null, costUnknown: true } : item;
+  });
+}
+
+const sumKnown = (items, key) => items.reduce((sum, i) => sum + (i[key] ?? 0), 0);
+const unknownCount = (items) => items.filter((i) => i.costUnknown).length;
+const profitText = (items, currency) =>
+  items.length && unknownCount(items) === items.length ? '<span class="muted" title="Cost price not set yet">—</span>' : formatCents(sumKnown(items, 'gross_profit_cents'), currency);
+
 async function init() {
   registerServiceWorker();
 
@@ -40,22 +68,23 @@ async function init() {
   renderNav(profile);
 
   const client = getClient();
-  const [{ data: s }, { data: si }, { data: sir }, { data: p }, { data: v }] = await Promise.all([
+  const [{ data: s }, { data: si }, { data: sir }, { data: p }, { data: v }, { data: costs }] = await Promise.all([
     client.from('sales').select('*'),
     client.from('v_sale_items').select('*'),
     client.from('v_sale_item_returns').select('*'),
     client.from('products').select('id, name'),
     client.from('product_variants').select('id, product_id, size, color, sku'),
+    client.from('product_cost_history').select('product_id, effective_date, is_placeholder'),
   ]);
   sales = s ?? [];
-  saleItems = si ?? [];
   saleReturns = sir ?? [];
   products = p ?? [];
   variants = v ?? [];
+  saleItems = markUnknownCosts(si ?? [], costs);
 
   wireControls();
   setPreset('month');
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localISODate(new Date());
   document.getElementById('monthly-detail-month').value = today.slice(0, 7);
   document.getElementById('z-report-date').value = today;
   renderMonthlyDetail();
@@ -79,7 +108,7 @@ function wireControls() {
 }
 
 function isoDate(d) {
-  return d.toISOString().slice(0, 10);
+  return localISODate(d);
 }
 
 function setPreset(preset) {
@@ -155,7 +184,7 @@ function renderSummaryCards() {
     .map(([currency, list]) => {
       const items = itemsForSales(list.map((s) => s.id));
       const revenueCents = list.reduce((sum, s) => sum + s.total_cents, 0);
-      const profitCents = items.reduce((sum, i) => sum + (i.gross_profit_cents ?? 0), 0);
+      const missingCost = unknownCount(items);
       const txCount = list.length;
       const avgCents = Math.round(revenueCents / txCount);
       return `
@@ -163,7 +192,7 @@ function renderSummaryCards() {
           <h2 style="font-size: 1rem;">${currency}</h2>
           <div class="form-grid">
             <div><div style="color: var(--text-muted); font-size: 0.8rem;">Total sales</div><div style="font-size: 1.3rem; font-weight: 600;">${formatCents(revenueCents, currency)}</div></div>
-            <div><div style="color: var(--text-muted); font-size: 0.8rem;">Total profit</div><div style="font-size: 1.3rem; font-weight: 600;">${formatCents(profitCents, currency)}</div></div>
+            <div><div style="color: var(--text-muted); font-size: 0.8rem;">Total profit</div><div style="font-size: 1.3rem; font-weight: 600;">${profitText(items, currency)}</div>${missingCost ? `<div class="muted" style="font-size: 12.5px;">Leaves out ${missingCost} item${missingCost === 1 ? '' : 's'} with no cost price set</div>` : ''}</div>
             <div><div style="color: var(--text-muted); font-size: 0.8rem;">Transactions</div><div style="font-size: 1.3rem; font-weight: 600;">${txCount}</div></div>
             <div><div style="color: var(--text-muted); font-size: 0.8rem;">Average sale</div><div style="font-size: 1.3rem; font-weight: 600;">${formatCents(avgCents, currency)}</div></div>
           </div>
@@ -174,7 +203,7 @@ function renderSummaryCards() {
 
 function periodLabel(dateObj, gran) {
   if (gran === 'daily') return isoDate(dateObj);
-  if (gran === 'monthly') return dateObj.toISOString().slice(0, 7);
+  if (gran === 'monthly') return localISODate(dateObj).slice(0, 7);
   // Weekly: label by the Monday that starts the ISO-ish week (Sunday-start, to match setPreset).
   const monday = new Date(dateObj);
   monday.setDate(dateObj.getDate() - dateObj.getDay());
@@ -202,7 +231,7 @@ function renderPeriodTable() {
       }
       for (const label of Object.keys(periods)) {
         const items = itemsForSales(periods[label].sales);
-        periods[label].profit = items.reduce((sum, i) => sum + (i.gross_profit_cents ?? 0), 0);
+        periods[label].items = items;
       }
       const rows = Object.entries(periods)
         .sort(([a], [b]) => (a < b ? -1 : 1))
@@ -212,7 +241,7 @@ function renderPeriodTable() {
           <td>${label}</td>
           <td>${p.sales.length}</td>
           <td>${formatCents(p.revenue, currency)}</td>
-          <td>${formatCents(p.profit, currency)}</td>
+          <td>${profitText(p.items, currency)}</td>
         </tr>`
         )
         .join('');
@@ -248,10 +277,14 @@ function renderProductPerformance() {
     const productId = variant?.product_id ?? 'unknown';
     const productName = productById[productId]?.name ?? 'Unknown product';
     const bucket = (byCurrency[currency] ??= {});
-    const entry = (bucket[productId] ??= { name: productName, quantity: 0, revenue: 0, profit: 0 });
+    const entry = (bucket[productId] ??= { name: productName, quantity: 0, revenue: 0, profit: 0, knownRevenue: 0, costUnknown: false });
     entry.quantity += item.quantity;
     entry.revenue += item.quantity * item.unit_selling_price_cents;
-    entry.profit += item.gross_profit_cents ?? 0;
+    if (item.costUnknown) entry.costUnknown = true;
+    else {
+      entry.profit += item.gross_profit_cents ?? 0;
+      entry.knownRevenue += item.quantity * item.unit_selling_price_cents;
+    }
   }
 
   container.innerHTML = Object.entries(byCurrency)
@@ -259,14 +292,15 @@ function renderProductPerformance() {
       const rows = Object.values(productsInCurrency)
         .sort((a, b) => b.revenue - a.revenue)
         .map((p) => {
-          const margin = p.revenue > 0 ? ((p.profit / p.revenue) * 100).toFixed(1) : '0.0';
+          const noCost = p.knownRevenue === 0;
+          const margin = noCost ? null : ((p.profit / p.knownRevenue) * 100).toFixed(1);
           return `
         <tr>
-          <td>${p.name}</td>
+          <td>${p.name}${p.costUnknown ? ' <span class="pill pill-warning" style="font-size: 11.5px;">Cost not set</span>' : ''}</td>
           <td>${p.quantity}</td>
           <td>${formatCents(p.revenue, currency)}</td>
-          <td>${formatCents(p.profit, currency)}</td>
-          <td>${margin}%</td>
+          <td>${noCost ? '<span class="muted">—</span>' : formatCents(p.profit, currency)}</td>
+          <td>${margin == null ? '<span class="muted">—</span>' : `${margin}%`}</td>
         </tr>`;
         })
         .join('');
@@ -309,11 +343,14 @@ function renderMonthlyDetail() {
     const productId = variant?.product_id ?? 'unknown';
     const productName = productById[productId]?.name ?? 'Unknown product';
     const bucket = (byCurrency[currency] ??= {});
-    const entry = (bucket[productId] ??= { name: productName, quantity: 0, revenue: 0, cost: 0, profit: 0 });
+    const entry = (bucket[productId] ??= { name: productName, quantity: 0, revenue: 0, cost: 0, profit: 0, known: 0 });
     entry.quantity += item.quantity;
     entry.revenue += item.quantity * item.unit_selling_price_cents;
-    entry.cost += item.cost_of_goods_sold_cents ?? 0;
-    entry.profit += item.gross_profit_cents ?? 0;
+    if (!item.costUnknown) {
+      entry.known += 1;
+      entry.cost += item.cost_of_goods_sold_cents ?? 0;
+      entry.profit += item.gross_profit_cents ?? 0;
+    }
   }
 
   container.innerHTML =
@@ -327,8 +364,8 @@ function renderMonthlyDetail() {
           <td>${p.name}</td>
           <td>${p.quantity}</td>
           <td>${formatCents(p.revenue, currency)}</td>
-          <td>${formatCents(p.cost, currency)}</td>
-          <td>${formatCents(p.profit, currency)}</td>
+          <td>${p.known ? formatCents(p.cost, currency) : '<span class="muted">Not set</span>'}</td>
+          <td>${p.known ? formatCents(p.profit, currency) : '<span class="muted">—</span>'}</td>
         </tr>`
           )
           .join('');
@@ -429,12 +466,14 @@ async function exportToExcel() {
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(allSales ?? []), 'Sales');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(allItems ?? []), 'Sale Items');
+  const known = new Set(saleItems.filter((i) => !i.costUnknown).map((i) => i.id));
+  const items = (allItems ?? []).map((i) => (known.has(i.id) ? { ...i, cost_price_set: 'yes' } : { ...i, unit_cost_at_sale_cents: null, cost_of_goods_sold_cents: null, gross_profit_cents: null, cost_price_set: 'no' }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(items), 'Sale Items');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(allProducts ?? []), 'Products');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(allVariants ?? []), 'Variants');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(allCustomers ?? []), 'Customers');
 
-  XLSX.writeFile(wb, `subtle-pos-export-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  XLSX.writeFile(wb, `subtle-pos-export-${localISODate(new Date())}.xlsx`);
 }
 
 init();

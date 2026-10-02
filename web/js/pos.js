@@ -28,6 +28,39 @@ let locationName = '';
 let balancesByVariant = {}; // variant_id -> quantity_available at the CURRENT location, display-only
 let activeCategory = null; // category name, or null for All
 
+// The cart in progress is saved on this device after every change, so a reload, a crashed
+// tab or a dead battery doesn't lose a half-built sale. Per user, and cleared once the
+// sale completes.
+const cartKey = () => `subtle-pos-cart:${profile.id}`;
+
+function saveCart() {
+  try {
+    const lines = cart.map((l) => ({ variantId: l.variant.id, quantity: l.quantity }));
+    const customer = { name: document.getElementById('customer-name').value, phone: document.getElementById('customer-phone').value };
+    if (lines.length || customer.name || customer.phone) localStorage.setItem(cartKey(), JSON.stringify({ lines, customer }));
+    else localStorage.removeItem(cartKey());
+  } catch {
+    // storage blocked or full -- the sale still works, it just won't survive a reload
+  }
+}
+
+function restoreCart() {
+  let saved = null;
+  try {
+    saved = JSON.parse(localStorage.getItem(cartKey()) ?? 'null');
+  } catch {
+    return;
+  }
+  if (!saved) return;
+  for (const { variantId, quantity } of saved.lines ?? []) {
+    const product = products.find((p) => p.variants.some((v) => v.id === variantId));
+    if (!product || currentPriceCents(product) == null) continue; // removed or no longer sellable
+    cart.push({ product, variant: product.variants.find((v) => v.id === variantId), quantity });
+  }
+  document.getElementById('customer-name').value = saved.customer?.name ?? '';
+  document.getElementById('customer-phone').value = saved.customer?.phone ?? '';
+}
+
 // STEP 9 (promotions): a manual discount above this cap needs a manager's PIN, verified
 // against verify_manager_pin() at checkout time so the approving manager's id (not the PIN
 // itself) can be recorded on the sale. Defaults to $20 if app_settings can't be reached
@@ -47,9 +80,11 @@ async function init() {
   await loadProducts();
   await loadLocationName();
   await loadDiscountCap();
+  restoreCart();
   renderCategoryChips();
   renderProductGrid();
   renderCart();
+  ['customer-name', 'customer-phone'].forEach((id) => document.getElementById(id).addEventListener('input', saveCart));
   wireControls();
 
   initSyncListeners(refreshStatusBanner);
@@ -401,6 +436,7 @@ function renderCart() {
       </div>`;
       })
       .join('') || `<div class="cart-empty">${icon('cart', { size: 28 })}<p>Cart is empty. Tap a product to add it.</p></div>`;
+  saveCart();
 
   container.querySelectorAll('.cart-line').forEach((el) => {
     const id = el.dataset.id;

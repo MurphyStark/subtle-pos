@@ -89,7 +89,8 @@ function fillForm(p) {
   f.retail_price.value = p.retail ? (p.retail.unit_price_cents / 100).toFixed(2) : '';
   f.wholesale_price.value = p.wholesale ? (p.wholesale.unit_price_cents / 100).toFixed(2) : '';
   f.description.value = p.description ?? '';
-  f.cost_price.value = p.cost ? (p.cost.unit_cost_cents / 100).toFixed(2) : '';
+  f.cost_price.value = p.costSet ? (p.cost.unit_cost_cents / 100).toFixed(2) : '';
+  f.cost_price.placeholder = p.costSet ? 'e.g. 10.00' : 'Not set yet. Enter the real cost';
   f.min_wholesale_qty.value = p.min_wholesale_qty ?? 6;
   f.cost_price.required = false; // an existing product already has a cost basis
 }
@@ -382,8 +383,13 @@ async function save(event) {
     }
     if (f.cost_price.value !== '') {
       const cost = toCents(f.cost_price.value);
-      if (cost !== product.cost?.unit_cost_cents) {
+      if (cost !== product.cost?.unit_cost_cents || !product.costSet) {
         await client.from('product_cost_history').insert({ id: crypto.randomUUID(), product_id: product.id, supplier_id: await getOrCreateManualSupplier(client), unit_cost_cents: cost, currency: priceCurrency, effective_date: now });
+        // Stock that was only ever valued at the stand-in cost takes the real one, so
+        // average cost stops echoing the selling price.
+        if (!product.costSet && product.variants.length) {
+          await client.from('inventory_balances').update({ average_unit_cost_cents: cost }).in('variant_id', product.variants.map((v) => v.id));
+        }
         changes.push('cost price');
       }
     }

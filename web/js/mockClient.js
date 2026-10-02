@@ -17,12 +17,13 @@
 // with an existing demo session (still on the old placeholder products in localStorage)
 // gets reseeded automatically instead of staying stuck on stale sample data.
 // v5: full 107-variant catalog (WhatsApp + photos + price list) and the Warehouse location.
+// v10: placeholder costs flagged (cost shows as Not set until entered).
 // v9: profile fields (photo, job title, phones) for My Profile.
 // v8: product brands (redesign phase 2).
 // v7: product photos + categories (redesign phase 1).
 // v6: accounts are now Tracy (owner), Tanya (cashier) and Admin -- user_profiles is seeded
 // from DEMO_ACCOUNTS, so the old demo people must be reseeded away.
-const STATE_KEY = 'subtle-pos-demo-state-v9';
+const STATE_KEY = 'subtle-pos-demo-state-v10';
 const SESSION_KEY = 'subtle-pos-demo-session-v1';
 
 // Two locations: the shop everyone sells from, and a Warehouse that only the ADMIN can see
@@ -74,9 +75,9 @@ const DEMO_MANAGER_PINS = { 'user-owner': '1234' };
 // -- regenerate rather than hand-editing. One product per name (a name whose variants have
 // different prices is split, since price lives on the product); one variant per SKU row.
 // Products with no retail price yet are left out, since they can't be sold.
-//   - cost: taken from the tracker's Cost Price; where blank, seeded EQUAL to retail (zero
-//     margin) as an explicit placeholder -- gross profit on reports.html reads $0 until
-//     real costs are entered.
+//   - cost: taken from the tracker's Cost Price. Where blank, a stand-in cost row is added
+//     (is_placeholder -- see the placeholder_costs migration) so the product can be sold;
+//     the UI shows its cost as "Not set" and reports leave it out of profit.
 //   - qty / warehouseQty: the tracker's Opening Store / Opening Warehouse counts.
 // Barcode and reorder_threshold are blank in the tracker and left null/unset.
 const PRODUCT_SEED = [
@@ -87,7 +88,8 @@ const PRODUCT_SEED = [
     brand: "Chanel",
     description: null,
     retail: 8500,
-    cost: 8500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 8500,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-CHN-BLK", color: "Black, pearl top handle, chain strap", qty: 0, warehouseQty: 0 },
     ],
@@ -99,7 +101,8 @@ const PRODUCT_SEED = [
     brand: "Christian Dior",
     description: null,
     retail: 7500,
-    cost: 7500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 7500,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-DIO-BLK", color: "Black", qty: 0, warehouseQty: 0 },
       { sku: "SUB-DIO-WHT", color: "White", qty: 0, warehouseQty: 0 },
@@ -112,7 +115,8 @@ const PRODUCT_SEED = [
     brand: "Dolce & Gabbana",
     description: null,
     retail: 7500,
-    cost: 7500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 7500,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-DGH-BLK", color: "Black patent", qty: 0, warehouseQty: 0 },
       { sku: "SUB-DGH-RED", color: "Red patent", qty: 0, warehouseQty: 0 },
@@ -125,7 +129,8 @@ const PRODUCT_SEED = [
     brand: "Gucci",
     description: null,
     retail: 10000,
-    cost: 10000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 10000,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-GUB-WHT", color: "White quilted", qty: 0, warehouseQty: 0 },
     ],
@@ -137,7 +142,8 @@ const PRODUCT_SEED = [
     brand: "Jacquemus",
     description: null,
     retail: 7000,
-    cost: 7000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 7000,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-JAQ-BLK", color: "Black", qty: 0, warehouseQty: 0 },
       { sku: "SUB-JAQ-PNK", color: "Pink", qty: 0, warehouseQty: 0 },
@@ -150,7 +156,8 @@ const PRODUCT_SEED = [
     brand: "Louis Vuitton",
     description: null,
     retail: 9000,
-    cost: 9000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 9000,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-LVB-BRN", color: "Brown", qty: 0, warehouseQty: 0 },
     ],
@@ -162,7 +169,8 @@ const PRODUCT_SEED = [
     brand: "Louis Vuitton",
     description: null,
     retail: 11000,
-    cost: 11000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 11000,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-LVB-CRM", color: "Cream", qty: 0, warehouseQty: 0 },
     ],
@@ -174,7 +182,8 @@ const PRODUCT_SEED = [
     brand: "Prada",
     description: null,
     retail: 8500,
-    cost: 8500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 8500,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-PRA-BLK", color: "Black", qty: 0, warehouseQty: 0 },
     ],
@@ -186,7 +195,8 @@ const PRODUCT_SEED = [
     brand: "YSL",
     description: null,
     retail: 8500,
-    cost: 8500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 8500,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-YSB-BLK", color: "Black", qty: 0, warehouseQty: 0 },
     ],
@@ -198,7 +208,8 @@ const PRODUCT_SEED = [
     brand: "Dolce & Gabbana",
     description: null,
     retail: 7000,
-    cost: 7000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 7000,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-DGB-BLK", color: "Black with Gold Heart Buckle", qty: 0, warehouseQty: 0 },
     ],
@@ -210,7 +221,8 @@ const PRODUCT_SEED = [
     brand: "Fendi",
     description: null,
     retail: 3500,
-    cost: 3500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 3500,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-FEN-TAN", color: "Tan/Brown", qty: 0, warehouseQty: 0 },
     ],
@@ -222,7 +234,8 @@ const PRODUCT_SEED = [
     brand: "Gucci",
     description: null,
     retail: 7000,
-    cost: 7000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 7000,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-GUC-BLK", color: "Black, GG Buckle", qty: 0, warehouseQty: 0 },
     ],
@@ -234,7 +247,8 @@ const PRODUCT_SEED = [
     brand: "Gucci",
     description: null,
     retail: 2500,
-    cost: 2500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 2500,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-GUS-SLV", color: "Black strap, Silver GG Buckle", qty: 0, warehouseQty: 0 },
     ],
@@ -246,7 +260,8 @@ const PRODUCT_SEED = [
     brand: "Gucci",
     description: null,
     retail: 7000,
-    cost: 7000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 7000,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-GUT-BLK", color: "Black strap, silver/gold GG buckle", qty: 0, warehouseQty: 0 },
     ],
@@ -258,7 +273,8 @@ const PRODUCT_SEED = [
     brand: "Loewe",
     description: null,
     retail: 2500,
-    cost: 2500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 2500,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-LOE-GLD", color: "Gold", qty: 0, warehouseQty: 0 },
       { sku: "SUB-LOE-SLV", color: "Silver", qty: 0, warehouseQty: 0 },
@@ -271,7 +287,8 @@ const PRODUCT_SEED = [
     brand: "YSL",
     description: null,
     retail: 2500,
-    cost: 2500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 2500,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-YSL-BLK", color: "Black", qty: 0, warehouseQty: 0 },
       { sku: "SUB-YSL-GLD", color: "Black, gold buckle", qty: 0, warehouseQty: 0 },
@@ -284,7 +301,8 @@ const PRODUCT_SEED = [
     brand: "Brūmate",
     description: "Hydration made stylish and effortless! 100% leakproof.",
     retail: 4000,
-    cost: 4000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 4000,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-BMT-BLK", color: "Black 1.18ltrs", qty: 0, warehouseQty: 0 },
       { sku: "SUB-BMT-MBL", color: "Mist Blue 1.18ltrs", qty: 0, warehouseQty: 0 },
@@ -300,7 +318,8 @@ const PRODUCT_SEED = [
     brand: "Stanley",
     description: null,
     retail: 3000,
-    cost: 3000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 3000,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-FSS-BLK", color: "Black Leakproof 1.18L", qty: 0, warehouseQty: 0 },
       { sku: "SUB-FSS-BLU", color: "Blue Leakproof 1.18L", qty: 0, warehouseQty: 0 },
@@ -317,7 +336,8 @@ const PRODUCT_SEED = [
     brand: "Stanley",
     description: null,
     retail: 1500,
-    cost: 1500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 1500,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-IFS-BLK", color: "Black", qty: 0, warehouseQty: 0 },
       { sku: "SUB-IFS-LIL", color: "Lilac", qty: 0, warehouseQty: 0 },
@@ -334,7 +354,8 @@ const PRODUCT_SEED = [
     brand: "Owala",
     description: "For all your hot and cold beverages, 590mls. Leakproof.",
     retail: 3000,
-    cost: 3000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 3000,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-OWSS-BLK", color: "Black", qty: 0, warehouseQty: 0 },
       { sku: "SUB-OWSS-BLU", color: "Blue", qty: 0, warehouseQty: 0 },
@@ -351,7 +372,8 @@ const PRODUCT_SEED = [
     brand: "Stanley",
     description: "Double-wall vacuum-insulated stainless steel.",
     retail: 1500,
-    cost: 1500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 1500,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-SFS-BLK", color: "Black 887ml leakproof", qty: 0, warehouseQty: 0 },
       { sku: "SUB-SFS-LIL", color: "Lilac", qty: 0, warehouseQty: 0 },
@@ -365,7 +387,8 @@ const PRODUCT_SEED = [
     brand: "Stanley",
     description: null,
     retail: 1500,
-    cost: 1500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 1500,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-STQ-BHP", color: "Blush with Hot Pink handle 1.18L", qty: 0, warehouseQty: 0 },
       { sku: "SUB-STQ-BLK", color: "Black 1.18L", qty: 0, warehouseQty: 0 },
@@ -386,7 +409,8 @@ const PRODUCT_SEED = [
     brand: "Stanley",
     description: null,
     retail: 1500,
-    cost: 1500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 1500,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-STT-TYG", color: "Tyger 1.18L", qty: 0, warehouseQty: 0 },
     ],
@@ -398,7 +422,8 @@ const PRODUCT_SEED = [
     brand: "Stanley",
     description: null,
     retail: 1500,
-    cost: 1500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 1500,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-QFS-BLK", color: "Black", qty: 0, warehouseQty: 0 },
       { sku: "SUB-QFS-BLU", color: "Blue", qty: 0, warehouseQty: 0 },
@@ -414,7 +439,8 @@ const PRODUCT_SEED = [
     brand: null,
     description: null,
     retail: 2000,
-    cost: 2000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 2000,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-PRJ-AST", color: "White", qty: 0, warehouseQty: 0 },
     ],
@@ -426,7 +452,8 @@ const PRODUCT_SEED = [
     brand: null,
     description: "8GB storage capacity. Prints photos on the spot. Rechargeable battery.",
     retail: 3000,
-    cost: 3000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 3000,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-KID-STD", color: "Standard", qty: 0, warehouseQty: 0 },
     ],
@@ -438,7 +465,8 @@ const PRODUCT_SEED = [
     brand: "Celine",
     description: null,
     retail: 2000,
-    cost: 2000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 2000,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-CEH-BLK", color: "Black denim", qty: 0, warehouseQty: 0 },
       { sku: "SUB-CEH-BLU", color: "Blue denim", qty: 0, warehouseQty: 0 },
@@ -451,7 +479,8 @@ const PRODUCT_SEED = [
     brand: "Louis Vuitton",
     description: null,
     retail: 2000,
-    cost: 2000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 2000,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-LVH-DBL", color: "Dark blue denim, tan trim", qty: 0, warehouseQty: 0 },
       { sku: "SUB-LVH-LBL", color: "Light blue denim", qty: 0, warehouseQty: 0 },
@@ -465,7 +494,8 @@ const PRODUCT_SEED = [
     brand: "Loewe",
     description: null,
     retail: 2000,
-    cost: 2000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 2000,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-LSH-TBC", color: "Colour TBC", qty: 0, warehouseQty: 0 },
     ],
@@ -477,7 +507,8 @@ const PRODUCT_SEED = [
     brand: "Prada",
     description: null,
     retail: 3000,
-    cost: 3000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 3000,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-PRC-TBC", color: "Colour TBC", qty: 0, warehouseQty: 0 },
     ],
@@ -489,7 +520,8 @@ const PRODUCT_SEED = [
     brand: "Aokulasic",
     description: null,
     retail: 5000,
-    cost: 5000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 5000,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-AOK-GBK", color: "Gold frame, Black Leather Straps", qty: 0, warehouseQty: 0 },
       { sku: "SUB-AOK-SBK", color: "Silver frame, Black Leather Straps", qty: 0, warehouseQty: 0 },
@@ -503,7 +535,8 @@ const PRODUCT_SEED = [
     brand: "Carekiso",
     description: "A bold timepiece combining luxury styling with fascinating mechanics.",
     retail: 7000,
-    cost: 7000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 7000,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-CRK-ALB", color: "All Black", qty: 0, warehouseQty: 0 },
       { sku: "SUB-CRK-BKS", color: "Black Straps, Silver Frame", qty: 0, warehouseQty: 0 },
@@ -518,7 +551,8 @@ const PRODUCT_SEED = [
     brand: "Carekiso",
     description: null,
     retail: 8500,
-    cost: 8500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 8500,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-CDT-ALB", color: "All Black Leather Straps", qty: 0, warehouseQty: 0 },
       { sku: "SUB-CDT-BRN", color: "Brown Leather Straps", qty: 0, warehouseQty: 0 },
@@ -532,7 +566,8 @@ const PRODUCT_SEED = [
     brand: "Forsining",
     description: null,
     retail: 5000,
-    cost: 5000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 5000,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-FDM-GLD", color: "Gold", qty: 0, warehouseQty: 0 },
       { sku: "SUB-FDM-SLV", color: "Silver/Gold (2nd 'Gold' listing - confirm)", qty: 0, warehouseQty: 0 },
@@ -545,7 +580,8 @@ const PRODUCT_SEED = [
     brand: "Forsining",
     description: null,
     retail: 5000,
-    cost: 5000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 5000,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-FG8-GLD", color: "Gold", qty: 0, warehouseQty: 0 },
       { sku: "SUB-FG8-SLV", color: "Silver", qty: 0, warehouseQty: 0 },
@@ -558,7 +594,8 @@ const PRODUCT_SEED = [
     brand: "Forsining",
     description: null,
     retail: 6000,
-    cost: 6000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 6000,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-FOR-BLK", color: "Black - Stainless Steel Straps", qty: 0, warehouseQty: 0 },
       { sku: "SUB-FOR-GLD", color: "Gold - Stainless Steel Straps", qty: 0, warehouseQty: 0 },
@@ -572,7 +609,8 @@ const PRODUCT_SEED = [
     brand: "Mark Fairwhale",
     description: null,
     retail: 9500,
-    cost: 9500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 9500,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-MFT-BLK", color: "Black", qty: 0, warehouseQty: 0 },
       { sku: "SUB-MFT-WHT", color: "White", qty: 0, warehouseQty: 0 },
@@ -585,7 +623,8 @@ const PRODUCT_SEED = [
     brand: "Mark Fairwhale",
     description: null,
     retail: 8000,
-    cost: 8000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 8000,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-MF6-BLK", color: "Black - Stainless Steel", qty: 0, warehouseQty: 0 },
       { sku: "SUB-MF6-SLV", color: "Silver - Stainless Steel", qty: 0, warehouseQty: 0 },
@@ -598,7 +637,8 @@ const PRODUCT_SEED = [
     brand: "Binbond",
     description: "Striking forged-carbon-inspired design.",
     retail: 4000,
-    cost: 4000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 4000,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-BIN-CGB", color: "Striped Charcoal Grey Frame, Black Rubber Straps", qty: 0, warehouseQty: 0 },
       { sku: "SUB-BIN-CGR", color: "Striped Charcoal Grey Frame, Red Rubber Straps", qty: 0, warehouseQty: 0 },
@@ -613,7 +653,8 @@ const PRODUCT_SEED = [
     brand: null,
     description: "Perfect for car enthusiasts - unique 360° spinning wheel dial.",
     retail: 2500,
-    cost: 2500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 2500,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-SPW-GRN", color: "Green Straps", qty: 0, warehouseQty: 0 },
       { sku: "SUB-SPW-RED", color: "Red Straps", qty: 0, warehouseQty: 0 },
@@ -626,7 +667,8 @@ const PRODUCT_SEED = [
     brand: "Tevise",
     description: "Men's luxury watch - wear it daily.",
     retail: 4000,
-    cost: 4000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 4000,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-TEV-ALB", color: "All Black, Leather Straps", qty: 0, warehouseQty: 0 },
       { sku: "SUB-TEV-BKS", color: "Black Leather Straps, Silver Frame", qty: 0, warehouseQty: 0 },
@@ -640,7 +682,8 @@ const PRODUCT_SEED = [
     brand: null,
     description: "Men's luxury watch - wear it daily, it powers itself.",
     retail: 4000,
-    cost: 4000, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 4000,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-VIN-BLK", color: "Black Genuine Leather Straps", qty: 0, warehouseQty: 0 },
       { sku: "SUB-VIN-BRN", color: "Brown Genuine Leather Straps", qty: 0, warehouseQty: 0 },
@@ -653,7 +696,8 @@ const PRODUCT_SEED = [
     brand: "SKMEI",
     description: null,
     retail: 3500,
-    cost: 3500, // TODO: real cost not yet supplied -- seeded equal to retail (zero margin) as an explicit placeholder, not an estimate
+    cost: 3500,
+    costPlaceholder: true, // no real cost in the tracker yet -- shown as 'Not set', left out of profit
     variants: [
       { sku: "SUB-SKM-SCP", color: "Scorpion", qty: 0, warehouseQty: 0 },
       { sku: "SUB-SKM-SPD", color: "Spider", qty: 0, warehouseQty: 0 },
@@ -701,6 +745,7 @@ function buildSeed() {
       currency: 'USD',
       effective_date: '2026-01-01',
       stock_receipt_id: null,
+      is_placeholder: Boolean(p.costPlaceholder),
     });
 
     const variantDefs = p.variants ?? [{ size: null, color: null, skuSuffix: null, qty: p.qty, reorderThreshold: p.reorderThreshold }];
@@ -811,6 +856,98 @@ export function resetDemoData() {
   localStorage.removeItem(SESSION_KEY);
 }
 
+// Demo only, and only when someone clicks "Load sample data" on the login page: realistic
+// stock at both locations, sample cost prices, a few customers and three weeks of sales,
+// so Reports, low-stock warnings and stock history have something to show. Deterministic
+// (seeded random) so it looks the same every time. "Reset demo data" removes all of it.
+export function loadSampleData() {
+  let seed = 20260930;
+  const rand = () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const pick = (list) => list[Math.floor(rand() * list.length)];
+  const fresh = buildSeed();
+  const now = new Date();
+  const daysAgo = (d, hour = 10, min = 0) => {
+    const t = new Date(now);
+    t.setDate(t.getDate() - d);
+    t.setHours(hour, min, 0, 0);
+    return t.toISOString();
+  };
+
+  // Sample cost prices: 45-60% of retail, effective before the first sample sale.
+  const costByProduct = {};
+  for (const p of fresh.products) {
+    const retail = fresh.prices.find((x) => x.product_id === p.id && x.price_type === 'retail').unit_price_cents;
+    const cost = Math.round((retail * (0.45 + rand() * 0.15)) / 50) * 50;
+    costByProduct[p.id] = cost;
+    fresh.cost_history.push({ id: `cost-sample-${p.id}`, product_id: p.id, supplier_id: MANUAL_SUPPLIER_ID, unit_cost_cents: cost, currency: 'USD', effective_date: daysAgo(40), stock_receipt_id: null, is_placeholder: false });
+  }
+  const productOf = Object.fromEntries(fresh.variants.map((v) => [v.id, v.product_id]));
+
+  // Stock: mostly healthy, some low, some out; the Warehouse holds back-stock.
+  for (const b of fresh.balances) {
+    const r = rand();
+    b.quantity_available = b.location_id === SHOP_ID ? (r < 0.12 ? 0 : r < 0.27 ? 1 + Math.floor(rand() * 2) : 3 + Math.floor(rand() * 12)) : r < 0.3 ? 0 : 4 + Math.floor(rand() * 18);
+    b.average_unit_cost_cents = costByProduct[productOf[b.variant_id]];
+  }
+
+  fresh.customers = [
+    ['Grace Moyo', '+263 77 123 4567'], ['Tatenda Ncube', '+263 71 987 6543'], ['Ruvimbo Chikomo', '+263 78 345 6789'], ['Brian Mutasa', '+263 77 222 3344'],
+    ['Nyasha Dube', '+263 71 456 7890'], ['Chipo Kamau', '+263 78 999 1111'], ['Tinashe Mupfumi', '+263 71 333 4444'], ['Sarah Lunga', '+263 77 888 2222'],
+  ].map(([name, phone], i) => ({ id: `cust-sample-${i + 1}`, name, phone, email: null, created_at: daysAgo(30 - i) }));
+
+  // Three weeks of sales, 2-6 a day, mostly by Tanya at the shop.
+  const sellable = fresh.variants.filter((v) => fresh.balances.some((b) => b.variant_id === v.id));
+  const priceOf = (productId) => fresh.prices.find((x) => x.product_id === productId && x.price_type === 'retail').unit_price_cents;
+  const methods = ['ecocash', 'ecocash', 'ecocash', 'ecocash', 'cash', 'cash', 'cash', 'card', 'card', 'bank_transfer'];
+  for (let day = 21; day >= 0; day--) {
+    const count = day === 0 ? 2 : 2 + Math.floor(rand() * 5);
+    for (let n = 0; n < count; n++) {
+      const hour = day === 0 ? Math.min(now.getHours(), 9 + n) : 9 + Math.floor(rand() * 8);
+      const createdAt = daysAgo(day, hour, Math.floor(rand() * 60));
+      if (new Date(createdAt) > now) continue;
+      const saleId = `sale-sample-${day}-${n}`;
+      const lines = [];
+      for (let k = 0, m = rand() < 0.7 ? 1 : 2 + Math.floor(rand() * 2); k < m; k++) {
+        const v = pick(sellable);
+        if (lines.some((l) => l.variant_id === v.id)) continue;
+        const price = priceOf(v.product_id);
+        const qty = rand() < 0.85 ? 1 : 2;
+        const cost = costByProduct[v.product_id];
+        lines.push({ id: `${saleId}-${k}`, sale_id: saleId, variant_id: v.id, quantity: qty, unit_selling_price_cents: price, currency: 'USD', unit_cost_at_sale_cents: cost, cost_of_goods_sold_cents: qty * cost, gross_profit_cents: qty * (price - cost), created_at: createdAt });
+      }
+      const subtotal = lines.reduce((sum, l) => sum + l.quantity * l.unit_selling_price_cents, 0);
+      const customer = rand() < 0.35 ? pick(fresh.customers) : null;
+      fresh.sales.push({ id: saleId, location_id: SHOP_ID, cashier_id: rand() < 0.75 ? 'user-cashier' : 'user-owner', sale_type: 'retail', currency: 'USD', subtotal_cents: subtotal, discount_cents: 0, tax_cents: 0, total_cents: subtotal, customer_id: customer?.id ?? null, discount_code: null, discount_approved_by: null, sync_status: 'synced', created_at: createdAt });
+      fresh.sale_items.push(...lines);
+      fresh.sale_payments.push({ id: `${saleId}-pay`, sale_id: saleId, method: pick(methods), currency: 'USD', amount_cents: subtotal, created_at: createdAt });
+    }
+  }
+
+  // One completed stock take ten days ago, with a couple of variances.
+  const countId = 'count-sample-1';
+  fresh.stock_counts.push({ id: countId, location_id: SHOP_ID, status: 'completed', counted_by: 'user-owner', sync_status: 'synced', notes: null, created_at: daysAgo(10, 17), completed_at: daysAgo(10, 17, 30) });
+  fresh.balances.filter((b) => b.location_id === SHOP_ID).slice(0, 6).forEach((b, i) => {
+    const system = b.quantity_available + [1, 0, 0, -1, 0, 0][i];
+    fresh.stock_count_items.push({ id: `${countId}-${i}`, stock_count_id: countId, variant_id: b.variant_id, counted_quantity: b.quantity_available, system_quantity_at_count: Math.max(0, system), notes: i === 0 ? 'Slightly damaged box' : i === 3 ? 'Found 1 extra unit' : null, created_at: daysAgo(10, 17, 30) });
+  });
+
+  fresh.activity_log = fresh.sales.slice(-12).map((sale) => ({
+    id: `act-${sale.id}`,
+    user_id: sale.cashier_id,
+    action: 'sale',
+    description: `${sale.cashier_id === 'user-cashier' ? 'Tanya' : 'Tracy'} completed a sale of $${(sale.total_cents / 100).toFixed(2)}`,
+    metadata: { sale_id: sale.id },
+    created_at: sale.created_at,
+  }));
+
+  localStorage.setItem(STATE_KEY, JSON.stringify(fresh));
+}
+
 const state = loadState();
 
 function loadSession() {
@@ -836,6 +973,7 @@ function canSeeRow(table, row) {
     case 'locations':
       return row.id !== WAREHOUSE_ID;
     case 'v_inventory_balances':
+    case 'inventory_balances':
     case 'stock_counts':
     case 'stock_receipts':
     case 'purchase_orders':
@@ -878,6 +1016,7 @@ function tableRows(table) {
     case 'stock_count_items':
       return state.stock_count_items;
     case 'v_inventory_balances':
+    case 'inventory_balances':
       return state.balances;
     case 'locations':
       return DEMO_LOCATIONS;

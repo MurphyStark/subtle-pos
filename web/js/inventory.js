@@ -35,12 +35,14 @@ async function init() {
     { data: products, error: prodErr },
     { data: locs, error: locErr },
     { data: categories },
+    { data: costRows },
   ] = await Promise.all([
     client.from('v_inventory_balances').select('*'),
     client.from('product_variants').select('id, product_id, size, color, sku, barcode, reorder_threshold'),
     client.from('products').select('id, name, image_url, category_id'),
     client.from('locations').select('id, name'),
     client.from('categories').select('id, name').order('name'),
+    client.from('product_cost_history').select('product_id, effective_date, is_placeholder').order('effective_date', { ascending: false }),
   ]);
 
   const firstError = balErr || variantErr || prodErr || locErr;
@@ -53,6 +55,10 @@ async function init() {
   locations = locs;
   const productById = Object.fromEntries(products.map((p) => [p.id, p]));
   const categoryName = Object.fromEntries((categories ?? []).map((c) => [c.id, c.name]));
+  // Products whose current cost is only a stand-in: their average cost reads "Not set".
+  const latestCost = {};
+  for (const c of costRows ?? []) latestCost[c.product_id] ??= c;
+  const costNotSet = (productId) => Boolean(latestCost[productId]?.is_placeholder);
 
   // Pivot balances (one per variant per location) into one row per variant.
   const byVariant = {};
@@ -83,7 +89,7 @@ async function init() {
         status: stockStatus(total, v.reorder_threshold),
         // Quantity-weighted across locations; falls back to any location's average when
         // nothing is in stock yet.
-        avgCost: r.costUnits > 0 ? Math.round(r.costTotal / r.costUnits) : r.anyCost,
+        avgCost: costNotSet(v.product_id) ? null : r.costUnits > 0 ? Math.round(r.costTotal / r.costUnits) : r.anyCost,
         currency: r.currency,
         needsReview: r.needsReview,
       };
@@ -103,8 +109,8 @@ async function init() {
 
   document.getElementById('inventory-head').innerHTML = `
     <tr>
-      <th>SKU</th><th>Product</th><th>Variant</th>
-      ${locations.map((l) => `<th class="num">${l.name}</th>`).join('')}
+      <th>Product</th>
+      ${locations.map((l) => `<th class="num">${l.name.replace(/^Subtle Accessories /, '')}</th>`).join('')}
       ${locations.length > 1 ? '<th class="num">Total</th>' : ''}
       <th class="num">Avg. unit cost</th><th>Status</th><th></th>
     </tr>`;
@@ -163,7 +169,7 @@ function renderRows() {
   });
   view.page = page;
 
-  const colspan = 7 + locations.length + (locations.length > 1 ? 1 : 0);
+  const colspan = 5 + locations.length + (locations.length > 1 ? 1 : 0);
   document.getElementById('inventory-body').innerHTML =
     visible
       .slice(from, to)
@@ -171,12 +177,10 @@ function renderRows() {
         const variantLabel = [r.variant.size, r.variant.color].filter(Boolean).join(' / ') || '—';
         return `
         <tr class="product-row${r.needsReview ? ' needs-review' : ''}" data-id="${r.variant.id}">
-          <td class="muted nowrap">${r.variant.sku ?? '—'}</td>
-          <td><a class="cell-product" href="variant.html?id=${r.variant.id}">${thumb(r.product?.image_url, '', 'sm')}<span class="name">${r.product?.name ?? 'Unknown product'}</span></a></td>
-          <td class="muted">${variantLabel}</td>
+          <td><a class="cell-product" href="variant.html?id=${r.variant.id}">${thumb(r.product?.image_url, '', 'md')}<span><span class="name">${r.product?.name ?? 'Unknown product'}</span><span class="sub">${variantLabel} · ${r.variant.sku ?? '—'}</span></span></a></td>
           ${locations.map((l) => `<td class="num">${r.qty[l.id] ?? 0}</td>`).join('')}
           ${locations.length > 1 ? `<td class="num"><strong>${r.total}</strong></td>` : ''}
-          <td class="num">${formatCents(r.avgCost, r.currency)}</td>
+          <td class="num">${r.avgCost == null ? '<span class="muted">Not set</span>' : formatCents(r.avgCost, r.currency)}</td>
           <td>${r.needsReview ? '<span class="pill pill-warning">Needs review</span>' : stockPill(r.status)}</td>
           <td>${r.status !== 'in' ? `<a href="purchase-orders.html?variant=${r.variant.id}">Reorder</a>` : ''}</td>
         </tr>`;
@@ -205,7 +209,7 @@ function exportCsv() {
   const csv = [header, ...lines].map((cols) => cols.map((c) => `"${String(c).replaceAll('"', '""')}"`).join(',')).join('\n');
   const link = document.createElement('a');
   link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-  link.download = `inventory-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.download = `inventory-${new Date().toLocaleDateString('en-CA')}.csv`; // en-CA = YYYY-MM-DD, local date
   link.click();
   URL.revokeObjectURL(link.href);
 }
