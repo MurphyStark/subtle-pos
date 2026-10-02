@@ -43,7 +43,7 @@ export function statCard({ label, value, sub = '', iconName = 'box', tone = 'blu
 
 export function thumb(url, alt = '', size = 'md') {
   return url
-    ? `<img class="thumb thumb-${size}" src="${url}" alt="${alt}" loading="lazy" />`
+    ? `<img class="thumb thumb-${size}" src="${url}" alt="${alt}" loading="lazy" decoding="async" onload="this.classList.add('is-loaded')" />`
     : `<span class="thumb thumb-${size} thumb-empty">${icon('image', { size: size === 'lg' ? 28 : 18 })}</span>`;
 }
 

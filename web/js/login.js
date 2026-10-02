@@ -1,7 +1,7 @@
 import { getClient, isDemoMode } from './supabaseClient.js';
 import { getCurrentProfile } from './auth.js';
 import { registerServiceWorker } from './pwa.js';
-import { DEMO_ACCOUNTS, resetDemoData } from './mockClient.js';
+import { DEMO_ACCOUNTS, resetDemoData, loadSampleData } from './mockClient.js';
 import { logActivity } from './activity.js';
 import { roleLabel } from './nav.js';
 
@@ -76,18 +76,42 @@ function renderDemoLogin() {
         </button>`
       ).join('')}
     </div>
-    <button type="button" id="demo-reset" class="ghost" style="width: 100%; margin-top: 0.6rem; font-size: 0.8rem;">
-      Reset demo data
-    </button>
+    <div class="demo-data-actions">
+      <button type="button" id="demo-sample" class="ghost" title="Stock at both locations, sample cost prices, customers and three weeks of sales">Load sample data</button>
+      <button type="button" id="demo-reset" class="ghost">Reset demo data</button>
+    </div>
+    <p class="demo-data-note" id="demo-data-note"></p>
   `;
 
   panel.querySelectorAll('.demo-account-btn').forEach((btn) => {
     btn.addEventListener('click', () => signIn(btn.dataset.email, 'demo'));
   });
   document.getElementById('demo-reset').addEventListener('click', () => {
+    if (!confirm('Reset the demo? Everything entered in this browser (sales, products, stock, photos) is cleared.')) return;
     resetDemoData();
     window.location.reload();
   });
+  document.getElementById('demo-sample').addEventListener('click', () => {
+    if (!confirm('Load sample data? This replaces the demo data in this browser with sample stock, cost prices, customers and three weeks of sales.')) return;
+    loadSampleData();
+    // Reload so this page's in-memory demo state is the sample too -- otherwise signing in
+    // (which logs activity and saves state) would write the old data back over it.
+    try {
+      sessionStorage.setItem('subtle-pos-demo-note', 'Sample data loaded. Sign in to explore it.');
+    } catch {
+      // the note is a nicety
+    }
+    window.location.reload();
+  });
+  try {
+    const note = sessionStorage.getItem('subtle-pos-demo-note');
+    if (note) {
+      document.getElementById('demo-data-note').textContent = note;
+      sessionStorage.removeItem('subtle-pos-demo-note');
+    }
+  } catch {
+    // ignore
+  }
 }
 
 init();

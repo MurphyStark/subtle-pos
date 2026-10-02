@@ -12,7 +12,8 @@
 // v10: redesign phase 2 -- stock take wizard/history/report, product and variant pages.
 // v11: network-first fetch so a new deploy shows up on the next load.
 // v12: My Profile page.
-const CACHE_NAME = 'subtle-pos-shell-v12';
+// v13: review fixes -- images cache-first, smaller photos, local-date reports, cart kept.
+const CACHE_NAME = 'subtle-pos-shell-v13';
 const APP_SHELL = [
   './',
   './index.html',
@@ -89,6 +90,25 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return; // let Supabase/CDN requests pass through untouched
+
+  // Product photos and icons rarely change (a new photo gets a new file name), so serve them
+  // from the cache once fetched -- saves mobile data and stops tiles loading grey each time.
+  if (event.request.method === 'GET' && /\.(jpe?g|png|webp|svg)$/i.test(url.pathname)) {
+    event.respondWith(
+      caches.match(event.request).then(
+        (cached) =>
+          cached ??
+          fetch(event.request).then((response) => {
+            if (response.ok) {
+              const clone = response.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+            }
+            return response;
+          })
+      )
+    );
+    return;
+  }
 
   // Network first, cache as the offline fallback: when online you always get the latest
   // deploy (a cache-first shell kept showing the previous version after an update until a
